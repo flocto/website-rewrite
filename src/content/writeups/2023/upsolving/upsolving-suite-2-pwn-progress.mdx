@@ -50,7 +50,7 @@ I'll run through this section in `gdb` (with `gef`). Thankfully PIE is disabled 
 
 Anyway, here's what the stack looks like right before the `read` call:
 
-```text
+```plaintext
 0x007fffffffda50│+0x0000: 0x00000000000006f0     ← $rsp
 0x007fffffffda58│+0x0008: 0x007fffffffde39  →  0x537717b1438594eb
 0x007fffffffda60│+0x0010: 0x007ffff7fc1000  →  0x00010102464c457f
@@ -65,7 +65,7 @@ Anyway, here's what the stack looks like right before the `read` call:
 
 And here's what it looks like right before the `ret` of the `pwnme` function (assuming we don't overwrite anything):
 
-```text
+```plaintext
 0x007fffffffda98│+0x0000: 0x00000000400610  →  <main+9> mov eax, 0x0     ← $rsp
 0x007fffffffdaa0│+0x0008: 0x0000000000000001
 0x007fffffffdaa8│+0x0010: 0x007ffff7a01d90  →  <__libc_start_call_main+128> mov edi, eax
@@ -115,7 +115,7 @@ We can use the tool [`ROPgadget`](https://github.com/JonathanSalwan/ROPgadget) t
 ROPgadget --binary badchars --ropchain
 ```
 
-```text
+```plaintext
 Gadgets information
 ============================================================
 [lots of gadgets here]
@@ -387,7 +387,7 @@ p.interactive()
 
 And here's the flag:
 
-```text
+```plaintext
 $ python3 solve.py
 [+] Starting local process './badchars': pid 3674
 [*] Switching to interactive mode

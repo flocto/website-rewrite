@@ -79,7 +79,7 @@ Again, nothing to see here, just a survey.
 
 The first *real* challenge. The original challenge didn't release with the Python file, so let's start with the b64 file.
 Opening it up, we get:
-```text
+```plaintext
 UEsDBAoAAAAAADmPYVYAAAAAAAAAAAAAAAAJABwAY29tbWFuZHMvVVQJAAN95v9jfeb/Y3V4CwABBOgDAAAE6AMAAFBLAwQKAAAAAAAtj2FWWhLOtxMAAAATAAAAFAAcAGNvbW1hbmRzL2NvbW1hbmQudHh0VVQJAANm5v9jZub/Y3V4CwABBOgDAAAE6AMAAGVjaG8gJ0hlbGxvIFdvcmxkISdQSwMEFAAAAAgAMY9hVpwcB1ZUAAAAaQAAABIAHABjb21tYW5kcy9SRUFETUUubWRVVAkAA27m/2Nu5v9jdXgLAAEE6AMAAAToAwAANcrtDYAgDEXRVd4Axh0cpUKjxPIRWhS2l5j47yb3bArJ6QApXI6Rkl+t2+xkFJKCSqn5Zv9fXWAnQ4caRzxBBNzZNWMEwwSoLDQ+VFmbmGInd60vUEsBAh4DCgAAAAAAOY9hVgAAAAAAAAAAAAAAAAkAGAAAAAAAAAAQAO1BAAAAAGNvbW1hbmRzL1VUBQADfeb/Y3V4CwABBOgDAAAE6AMAAFBLAQIeAwoAAAAAAC2PYVZaEs63EwAAABMAAAAUABgAAAAAAAEAAACAgUMAAABjb21tYW5kcy9jb21tYW5kLnR4dFVUBQADZub/Y3V4CwABBOgDAAAE6AMAAFBLAQIeAxQAAAAIADGPYVacHAdWVAAAAGkAAAASABgAAAAAAAEAAACAgaQAAABjb21tYW5kcy9SRUFETUUubWRVVAUAA27m/2N1eAsAAQToAwAABOgDAABQSwUGAAAAAAMAAwABAQAARAEAAAAA
 ```
 Very clearly this is base64, so let's decode it.
@@ -89,7 +89,7 @@ data = open("commands.zip.b64", "r").read()
 open("commands.zip", "wb").write(base64.b64decode(data))
 ```
 
-```text
+```plaintext
 $ unzip commands.zip
 Archive:  commands.zip
    creating: commands/
@@ -98,12 +98,12 @@ Archive:  commands.zip
 ```
 
 Opening up `command.txt`, we get:
-```text
+```plaintext
 echo 'Hello World!'
 ```
 
 And `README.md`:
-```text
+```plaintext
 As long as command.txt contains approved commands, the system will execute it and relay the results back.
 ```
 
@@ -187,7 +187,7 @@ An interesting category you don't see in many CTFs.
 > `betta.utctf.live:8080`
 
 This challenge is just connecting via netcat.
-```terminal
+```plaintext
 $ nc betta.utctf.live 8080
 Hi Wade! I am using socat to broadcat this message. Pretty nifty right? --jwalker utflag{meh-netcats-cooler}
 ```
@@ -203,7 +203,7 @@ Hi Wade! I am using socat to broadcat this message. Pretty nifty right? --jwalke
 > `betta.utctf.live:8445`
 
 This time its a Samba share. Trying to connect shows that we don't even need a specific username or password.
-```terminal
+```plaintext
 $ smbclient -L \\betta.utctf.live -p 8445 -U %
 
         Sharename       Type      Comment
@@ -222,7 +222,7 @@ smb: \> ls
 smb: \> 
 ```
 Anyway, after looking around for a while, we come across `\WorkShares\shares\IT\Itstuff\notetoIT`:
-```terminal
+```plaintext
 smb: \shares\IT\Itstuff\> get notetoIT note.txt
 ...
 $ cat note.txt
@@ -298,15 +298,15 @@ with open("passwords.txt", "w") as f:
 ```
 
 Now we can use `hydra` to bruteforce the ssh server (and remembering to set a wait time to be nice to the server).
-```terminal
+```plaintext
 $ hydra -L usernames.txt -P passwords.txt -t 4 betta.utctf.live:8822 ssh -W 0.1
 ```
 After a while, we get a hit:
-```terminal
+```plaintext
 [8822][ssh] host: betta.utctf.live   login: wcoldwater   password: abracadabra$
 ```
 Now we can just connect via ssh and get our flag:
-```terminal
+```plaintext
 $ ssh wcoldwater@betta.utctf.live -p 8822
 wcoldwater@betta.utctf.live's password: abracadabra$
 utctf{cust0m3d-lsts-rule!} well done!
@@ -634,7 +634,7 @@ r.interactive()
 > [readingList](files/rev/readingList)
 
 Very simple strings challenge
-```terminal
+```plaintext
 $ strings readingList | grep "utflag"
 utflag{string_theory_is_a_cosmological_theory_based_on_the_existence_of_cosmic_strings}
 ```
@@ -722,7 +722,7 @@ Wooo redacted text woooo
 
 This really is an easy challenge, all we need to do is expand the memory dump and profile, import the profile into volatility3, and finally run the `linux.bash.Bash` plugin
 
-```terminal
+```plaintext
 $ python3 volatility3/vol.py -f debian11.core linux.bash.Bash
 Volatility 3 Framework 2.4.2
 Progress:  100.00               Stacking attempts finished

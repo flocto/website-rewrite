@@ -55,7 +55,7 @@ The expression register allows us to input expression and it will spit out the r
 
 What the expression register is actually doing is treating our input as `vimscript`, then executing it internally and returning the result. This means we basically have free `vimscript` execution, so running `system` should work right?
 
-```text
+```plaintext
 =system("ls")
 E145: Shell commands and some functionality not allowed in rvim
 ```
@@ -68,7 +68,7 @@ We can use `readfile("/flag.txt")` to get the flag, except we don't have any way
 
 (also `readfile` returns a list but obviously the flag will just be in the first line so we just use `[0]`)
 
-```text
+```plaintext
 =eval(readfile("/flag.txt")[0])
 E121: Undefined variable: n0_3sc4p3_f0r_y0u_8613a322d0eb0628
 Press ENTER or type command to continue
@@ -78,7 +78,7 @@ Press ENTER or type command to continue
 
 This also works for vimjail 1.5.
 
-```text
+```plaintext
 =eval(readfile("/flag.txt")[0])
 E121: Undefined variable: ctr1_r_1s_h4ndy_277d0fde079f49d2
 Press ENTER or type command to continue
@@ -90,7 +90,7 @@ Press ENTER or type command to continue
 
 This time theres a bit more limitations. In addition to the previously banned keybinds, all of the following are replaced with `_`.
 
-```text
+```plaintext
 abcdefghijklmnoprstuvwxyz!@#$%^&*-+=`~{}[]|\;<>,./?
 ```
 
@@ -119,7 +119,7 @@ You might think `glob` won't work either, since `^o` doesn't work, but we can ac
 
 So our final payload, and the flag, looks like this:
 
-```text
+```plaintext
 =eval(readfile(glob("/flag.t*t"))[0])
 E15: Invalid expression: "<left><left><left><left>_c364201e0d86171b"
 Press ENTER or type command to continue
@@ -129,7 +129,7 @@ Press ENTER or type command to continue
 
 vimjail 2.5:
 
-```text
+```plaintext
 =eval(readfile(glob("/flag.t*t"))[0])
 E488: Trailing characters: _kn0w_h0w_7o_ex1t_v1m_7661892ec70e3550
 Press ENTER or type command to continue
@@ -143,7 +143,7 @@ Press ENTER or type command to continue
 
 We're given two files, `janet` and `program.jimage`. Running as instructed, we're faced with a small game that seems impossible:
 
-```text
+```plaintext
 $ ./janet -i program.jimage
 Welcome to geoguesser!
 Where am I? 1,1
@@ -163,7 +163,7 @@ Now, looking up online, we can see that [janet](https://janet-lang.org/) is a sm
 
 With a small dump we can see:
 
-```text
+```plaintext
 $ strings program.jimage
 root-env
 parse-coord
@@ -243,7 +243,7 @@ coordinate-peg
 
 A whole lot of nonsense. The main parts of interest are:
 
-```text
+```plaintext
 init-rng
 os/time
 math/rng
@@ -252,7 +252,7 @@ init-rng
 
 and
 
-```text
+```plaintext
 random-float
 random-float
 math/rng-uniform
@@ -267,7 +267,7 @@ We can assume based off the first part of interest that `math/rng` gets seeded w
 
 Then, two random floats are generated, calling [`math/rng-uniform`, which generates a random number in `[0, 1)`](https://janet-lang.org/api/math.html#math/rng-uniform). The `random-float` function also seems to take in a min and a max, so logically, the most reasonable implementation would look like:
 
-```text
+```plaintext
 random-float = math/rng-uniform # [0, 1)
 random-float *= (max - min)
 random-float += min
@@ -281,7 +281,7 @@ So all we have to do is just reimplement all this logic ourselves, run our code 
 
 Here's my reimplementation in `janet` and corresponding solve script:
 
-```text
+```plaintext
 (def gen (math/rng (os/time)))
 (defn random-float [min max]
     (+ min (* (- max min) (math/rng-uniform gen)))
@@ -312,7 +312,7 @@ r.interactive()
 ````
 </CollapsableCodeBlock>
 After a few tries and praying we get the timing right, we can get the flag.
-```text
+```plaintext
 [+] Opening connection to geoguesser.chal.uiuc.tf on port 1337: Done
 [*] Switching to interactive mode
 == proof-of-work: disabled ==
@@ -976,7 +976,7 @@ def print_given(sv, n): # sv is the statevector from normalization("echo 'Hello,
 
 Connecting to the remote server, we can confirm this for ourselves:
 
-```text
+```plaintext
 == proof-of-work: disabled ==
 $ nc schrodingers-cat.chal.uiuc.tf 1337
 Welcome to the Quantum Secure Shell. Instead of dealing with pesky encryption, just embed your commands into our quantum computer! I batched the next command in with yours, hope you're ok with that!
@@ -1105,7 +1105,7 @@ qc.x(0)
 
 Interestingly, this time there's an error about invalid ASCII characters from the transform function:
 
-```text
+```plaintext
      ┌──────────────┐┌───────────────────────┐
 q_0: ┤0             ├┤0                      ├
      │              ││                       │
@@ -1129,7 +1129,7 @@ qc.h(0)
 
 We get a different error:
 
-```text
+```plaintext
      ┌──────────────┐┌───────────────────────┐
 q_0: ┤0             ├┤0                      ├
      │              ││                       │
@@ -1170,7 +1170,7 @@ print(msg)
 
 We get the same statevector, obviously:
 
-```text
+```plaintext
 [0.24094241 0.23617127 0.24809911 0.26479809 0.07633819 0.09303717
  0.17176093 0.24094241 0.25764139 0.25764139 0.26479809 0.10496501
  0.07633819 0.28388264 0.26479809 0.2719548  0.25764139 0.23855684
@@ -1236,7 +1236,7 @@ msg = transform(qc_sv, norm)
 print(msg)
 ```
 
-```text
+```plaintext
 Statevector([1.+0.j, 0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j,
              0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j,
              0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j,
@@ -1488,7 +1488,7 @@ qc.append(StatePreparation(X), range(5))
 print(qc.qasm())
 ```
 
-```text
+```plaintext
 OPENQASM 2.0;
 include "qelib1.inc";
 gate multiplex2_dg q0,q1 { multiplex1_reverse_dg q0; cx q1,q0; multiplex1_dg q0; }

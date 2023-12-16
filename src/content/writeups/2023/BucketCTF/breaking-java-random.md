@@ -13,7 +13,7 @@ Let's start out with the most basic challenge: `random security`.
 
 We're not given any source, so let's just connect to the server and see what we get.
 
-```terminal
+```plaintext
 $ nc 213.133.103.186 32811
 Since I am nice I will give you a random number:
 0.1406976754934386
@@ -537,7 +537,7 @@ for (int l = 0; l < maze.length; ++l) {
     System.out.println();
 }
 ```
-```text
+```plaintext
 $ 213.133.103.186 31851
 I've learned from my mistakes and this time I will construct a full maze you will never be able to break out of!!!
                                          
@@ -675,7 +675,7 @@ public static void initMap() {
 ```
 
 Running the file locally, we can now see exactly what's going on:
-```text
+```plaintext
 $ java Maze.java
 I've learned from my mistakes and this time I will construct a full maze you will never be able to break out of!!!
                                          
@@ -1147,7 +1147,7 @@ while queue:
         for dx, dy, c in dxyc:
             queue.append((x + dx, y + dy, path + c))
 ```
-```terminal
+```plaintext
 $ nc 213.133.103.186 32878
 *maze here*
 R
