@@ -1,0 +1,58 @@
+---
+type Props = {
+    filename: string;
+};
+
+const { filename }: Props = Astro.props;
+---
+
+<details id="filename" class="code-wrapper">
+    <summary class="code-summary">
+        <span class="code-summary-inner">
+            {filename}
+        </span>
+    </summary>
+    <slot />
+</details>
+<style>
+    .code-wrapper {
+        border-radius: 5px;
+        margin: 25px 0 25px 0;
+    }
+
+    .code-wrapper pre {
+        background-color: var(--gray-dark);
+    }
+
+    .code-wrapper[open] .code-summary {
+        list-style-type: '🔽 Click to close';
+    }
+
+    .code-summary {
+        border-radius: 5px;
+        padding: 10px;
+        list-style-type: '▶️ Click to open';
+        background-color: var(--gray-dark);
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        border-bottom: 3px solid var(--accent);
+        transition: all 0.15s ease-in-out;
+    }
+
+    .code-summary:hover {
+        background-color: var(--gray-light);
+        cursor: pointer;
+    }
+
+    .code-summary-inner {
+        color: var(--white-light);
+    }
+
+    .code-inner {
+        border-radius: 5px;
+    }
+</style>

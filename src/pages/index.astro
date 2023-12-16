@@ -1,50 +1,142 @@
 ---
-import BaseHead from '../components/BaseHead.astro';
-import Header from '../components/Header.astro';
-import Footer from '../components/Footer.astro';
-import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+import BaseHead from "../components/BaseHead.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import { SITE_TITLE, SITE_DESCRIPTION } from "../consts";
 ---
 
 <!doctype html>
 <html lang="en">
-	<head>
-		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
-	</head>
-	<body>
-		<Header title={SITE_TITLE} />
-		<main>
-			<h1>🧑‍🚀 Hello, Astronaut!</h1>
-			<p>
-				Welcome to the official <a href="https://astro.build/">Astro</a> blog starter template. This
-				template serves as a lightweight, minimally-styled starting point for anyone looking to
-				build a personal website, blog, or portfolio with Astro.
-			</p>
-			<p>
-				This template comes with a few integrations already configured in your
-				<code>astro.config.mjs</code> file. You can customize your setup with
-				<a href="https://astro.build/integrations">Astro Integrations</a> to add tools like
-				Tailwind, React, or Vue to your project.
-			</p>
-			<p>Here are a few ideas on how to get started with the template:</p>
-			<ul>
-				<li>Edit this page in <code>src/pages/index.astro</code></li>
-				<li>Edit the site header items in <code>src/components/Header.astro</code></li>
-				<li>Add your name to the footer in <code>src/components/Footer.astro</code></li>
-				<li>Check out the included blog posts in <code>src/pages/blog/</code></li>
-				<li>Customize the blog post page layout in <code>src/layouts/BlogPost.astro</code></li>
-			</ul>
-			<p>
-				Have fun! If you get stuck, remember to <a href="https://docs.astro.build/"
-					>read the docs
-				</a> or <a href="https://astro.build/chat">join us on Discord</a> to ask questions.
-			</p>
-			<p>
-				Looking for a blog template with a bit more personality? Check out <a
-					href="https://github.com/Charca/astro-blog-template"
-					>astro-blog-template
-				</a> by <a href="https://twitter.com/Charca">Maxi Ferreira</a>.
-			</p>
-		</main>
-		<Footer />
-	</body>
+    <head>
+        <BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+        <style>
+            main {
+                color: var(--white);
+				min-height: calc(100vh - 4rem);
+				display: flex;
+				flex-direction: column;
+				justify-content: center;
+				align-items: center;
+				padding: 0 1rem;
+            }
+            h1 {
+                font-size: 2.5rem;
+                font-weight: 700;
+                margin-bottom: 1rem;
+                color: var(--accent);
+            }
+            h1 span {
+                color: var(--accent);
+                transition: color 0.2s ease-in-out;
+            }
+            h1 span:hover {
+                color: var(--accent-dark);
+            }
+            .social-links {
+                display: flex;
+                justify-content: center;
+                gap: 3em;
+                margin-top: 0.2em;
+            }
+            .social-links a {
+                text-decoration: none;
+                color: var(--accent-dark);
+            }
+            .social-links a:hover {
+                color: var(--accent);
+            }
+			.profile {
+				animation: fade-down-in 1s ease-in-out;
+				animation-fill-mode: forwards;
+				animation-delay: 1.5s;
+				opacity: 0;
+			}
+			@keyframes fade-down-in {
+				0% {
+					opacity: 0;
+					transform: translateY(-1rem);
+				}
+				100% {
+					opacity: 1;
+					transform: translateY(0);
+				}
+			}
+        </style>
+    </head>
+    <body>
+        <Header title={SITE_TITLE} />
+        <main>
+            <h1>
+                Hi! I'm flocto
+                <img
+					class="profile"
+                    src="/profile.png"
+                    style="display:inline; height:100px; width:100px; vertical-align:middle;"
+                />
+            </h1>
+            <p>
+                Welcome to my official website and blog. This site hosts my
+                writeups for various CTF challenges as well as my own blog
+                posts.
+            </p>
+            <p>
+                If you're interested in seeing solutions to some CTF challenges
+                or challenges I've created myself, check out the <a
+                    href="/writeups">writeups</a
+                > page.
+
+				Otherwise, feel free to check out my <a href="/blog">blog</a> or
+                <a href="/about">about</a> page.
+            </p>
+            <p>
+                Have fun! If you ever have any questions or want to contact me,
+                feel free to react out via one of the methods below.
+            </p>
+            <div class="social-links">
+                <a href="https://twitter.com/fl0ct0" target="_blank">
+                    <span class="sr-only">Follow flocto on Twitter</span>
+                    <svg
+                        viewBox="0 0 16 16"
+                        aria-hidden="true"
+                        width="32"
+                        height="32"
+                        astro-icon="social/twitter"
+                        ><path
+                            fill="currentColor"
+                            d="M5.026 15c6.038 0 9.341-5.003 9.341-9.334 0-.14 0-.282-.006-.422A6.685 6.685 0 0 0 16 3.542a6.658 6.658 0 0 1-1.889.518 3.301 3.301 0 0 0 1.447-1.817 6.533 6.533 0 0 1-2.087.793A3.286 3.286 0 0 0 7.875 6.03a9.325 9.325 0 0 1-6.767-3.429 3.289 3.289 0 0 0 1.018 4.382A3.323 3.323 0 0 1 .64 6.575v.045a3.288 3.288 0 0 0 2.632 3.218 3.203 3.203 0 0 1-.865.115 3.23 3.23 0 0 1-.614-.057 3.283 3.283 0 0 0 3.067 2.277A6.588 6.588 0 0 1 .78 13.58a6.32 6.32 0 0 1-.78-.045A9.344 9.344 0 0 0 5.026 15z"
+                        ></path></svg
+                    >
+                </a>
+                <a href="https://github.com/flocto" target="_blank">
+                    <span class="sr-only">Go to flocto's GitHub repo</span>
+                    <svg
+                        viewBox="0 0 16 16"
+                        aria-hidden="true"
+                        width="32"
+                        height="32"
+                        astro-icon="social/github"
+                        ><path
+                            fill="currentColor"
+                            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+                        ></path></svg
+                    >
+                </a>
+                <a href="mailto:flocto@duck.com" target="_blank">
+                    <span class="sr-only">Email flocto</span>
+                    <svg
+                        viewBox="0 0 16 16"
+                        aria-hidden="true"
+                        width="32"
+                        height="32"
+                        astro-icon="social/email"
+                        ><path
+                            fill="currentColor"
+                            d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"
+                        ></path></svg
+                    >
+                </a>
+            </div>
+        </main>
+        <Footer />
+    </body>
 </html>
