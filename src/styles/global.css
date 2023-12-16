@@ -7,6 +7,7 @@
 :root {
     --white: #d9d7e0;
     --white-light: #f4f3f8;
+    --accent-light: #ffbb63;
     --accent: #ff9100;
     --accent-dark: #db810a;
     --blue: #2b5bbb;
@@ -125,12 +126,6 @@ h6 {
 .prose > h5 > a,
 .prose > h6 > a {
     color: var(--accent);
-    border-radius: 8px;
-    background-image: linear-gradient(var(--accent-dark) 0 0);
-    background-position: 0 95%;
-    background-size: 0% 4px;
-    background-repeat: no-repeat;
-    transition: background-size 0.2s, background-position 0s 0.2s;
 }
 .prose > h1 > a:hover,
 .prose > h2 > a:hover,
@@ -139,8 +134,6 @@ h6 {
 .prose > h5 > a:hover,
 .prose > h6 > a:hover {
     color: var(--accent);
-    background-position: 100% 95%; 
-    background-size: 100% 4px;
 }
 textarea {
     width: 100%;
@@ -268,12 +261,14 @@ hr {
     border-radius: 12px;
     box-shadow: var(--box-shadow);
     background-color: var(--gray-dark);
+    color: var(--accent);
 }
 .toc-post .toc-link {
-    color: var(--white);
+    color: var(--accent);
     text-decoration: none;
+    transition: color 0.2s ease-in-out;
 }
 
 .toc-post .toc-link:hover {
-    color: var(--blue-light);
+    color: var(--accent-light);
 }
