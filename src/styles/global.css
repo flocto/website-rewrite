@@ -37,6 +37,9 @@
     font-style: normal;
     font-display: swap;
 }
+html {
+    scroll-behavior: smooth;
+}
 body {
     font-family: "Atkinson", sans-serif;
     margin: 0;
@@ -261,14 +264,17 @@ hr {
     border-radius: 12px;
     box-shadow: var(--box-shadow);
     background-color: var(--gray-dark);
-    color: var(--accent);
+    list-style: none;
 }
-.toc-post .toc-link {
-    color: var(--accent);
+
+.toc-post .toc-link,
+.toc-post .toc-item::marker {
+    color: var(--white);
     text-decoration: none;
     transition: color 0.2s ease-in-out;
 }
 
-.toc-post .toc-link:hover {
-    color: var(--accent-light);
+.toc-post .toc-link:hover,
+.toc-post .toc-item:hover::marker {
+    color: var(--accent);
 }

@@ -25,14 +25,21 @@ const { filename }: Props = Astro.props;
     }
 
     .code-wrapper[open] .code-summary {
-        list-style-type: '⮟ Click to close';
+        background-image: url('/icons/down-chevron.svg');
+        list-style-type: "Click to close";
     }
 
     .code-summary {
         border-radius: 5px;
         padding: 10px;
-        list-style-type: '⮞ Click to open';
+        background-image: url('/icons/right-chevron.svg');
+        background-repeat: no-repeat;
+        background-position: 5px 50%;
         background-color: var(--gray-dark);
+        background-size: 20px;
+        list-style: none;
+        list-style-type: "Click to open";
+        list-style-position: inside;
         -webkit-touch-callout: none;
         -webkit-user-select: none;
         -khtml-user-select: none;
@@ -41,6 +48,7 @@ const { filename }: Props = Astro.props;
         user-select: none;
         border-bottom: 3px solid var(--accent);
         transition: all 0.15s ease-in-out;
+        padding-left: 30px;
     }
 
     .code-summary:hover {

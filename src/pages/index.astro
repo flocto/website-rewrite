@@ -24,32 +24,30 @@ import { SITE_TITLE, SITE_DESCRIPTION } from "../consts";
                 font-weight: 700;
                 margin-bottom: 1rem;
                 background-image: linear-gradient(
-                    135deg,
+                    45deg,
                     var(--accent) 0%,
-                    var(--purple) 80%
+                    var(--purple) 100%
                 );
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
                 -moz-background-clip: text;
                 -moz-text-fill-color: transparent;
-            }
-            h1 span {
-                border-radius: 8px;
-                background-image: linear-gradient(
-                    45deg,
-                    var(--accent) 0%,
-                    var(--purple) 100%
-                );
-                background-position: 0 95%;
-                background-size: 0% 4px;
                 background-repeat: no-repeat;
-                transition:
-                    background-size 0.2s,
-                    background-position 0s 0.2s;
+                background-size: 200% 200%;
+                background-position: 147% 100%;
+                animation: bg-shift 8s ease-in-out infinite;
+                animation-delay: 0.4s;
             }
-            h1 span:hover {
-                background-position: 100% 95%;
-                background-size: 100% 4px;
+            @keyframes bg-shift {
+                0% {
+                    background-position: 147% 100%;
+                }
+                50% {
+                    background-position: 0% 100%;
+                }
+                100% {
+                    background-position: 147% 100%;
+                }
             }
             .social-links {
                 display: flex;
@@ -89,12 +87,12 @@ import { SITE_TITLE, SITE_DESCRIPTION } from "../consts";
         <Header title={SITE_TITLE} />
         <main>
             <h1>
-                <span class="intro">Hi! I'm flocto</span>
                 <img
                     class="profile"
                     src="/profile.png"
-                    style="display:inline; height:100px; width:100px; vertical-align:middle;"
+                    style="display:block;height:100px; width:100px; vertical-align:middle;margin:auto;padding-bottom: 0.4em;"
                 />
+                <span class="intro">Hi! I'm flocto</span>
             </h1>
             <p>
                 Welcome to my official website and blog. This site hosts my
