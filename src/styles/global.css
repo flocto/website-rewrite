@@ -138,6 +138,28 @@ h6 {
 .prose > h6 > a:hover {
     color: var(--accent);
 }
+.prose > h1 > a::after,
+.prose > h2 > a::after,
+.prose > h3 > a::after,
+.prose > h4 > a::after,
+.prose > h5 > a::after,
+.prose > h6 > a::after {
+    content: "";
+    background-repeat: no-repeat;
+    background-position: 85% 50%;
+    background-image: url("/icons/link.svg");
+    background-size: 0 0;
+    transition: background-size 0.2s ease-in-out, padding-right 0.2s ease-in-out;
+}
+.prose > h1 > a:hover::after,
+.prose > h2 > a:hover::after,
+.prose > h3 > a:hover::after,
+.prose > h4 > a:hover::after,
+.prose > h5 > a:hover::after,
+.prose > h6 > a:hover::after {
+    padding-right: 1em;
+    background-size: 0.7em 0.7em;
+}
 textarea {
     width: 100%;
     font-size: 16px;
