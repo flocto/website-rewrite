@@ -2,6 +2,7 @@
 title: "Provably Secure 1 and 2"
 pubDate: "Feb 17 2023"
 description: "Spending way too long making an audioless 5 minute video..."
+heroImage: "/img/writeups/2023/provably-secure-1-and-2-hero.png"
 ---
 
 Wanted to try out something different, so I decided to use Motion Canvas to try and make a video writeup for the 2 easy crypto challs...

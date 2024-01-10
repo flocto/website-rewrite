@@ -2,6 +2,7 @@
 title: "Breaking Java Random - BucketCTF 2023 Writeup"
 pubDate: "Apr 12 2023"
 description: Cracking Java's util.Random RNG with only 1 sample.
+heroImage: "/img/writeups/2023/java-random-hero.png"
 ---
 
 The promised reverse engineering writeup is finally here. This post will feature 3 challenges: `random security`, `maze`, and `image`. 

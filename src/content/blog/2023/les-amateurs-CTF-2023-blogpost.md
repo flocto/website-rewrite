@@ -2,6 +2,7 @@
 title: "amateursCTF 2023 Blogpost"
 description: 'Some words about my experience helping with amateursCTF 2023'
 pubDate: 'Jul 17 2023'
+heroImage: '/img/blog/2023/amateurs-CTF/hero.png'
 ---
 
 The past 5 days marks the first public CTF that I've helped organize and write challenges for. It's been a really enlightening experience, beyond just seeing people ~~suffer~~ solve my challenges, I've learned a lot about the behind-the-scenes of CTFs and how they're run. 

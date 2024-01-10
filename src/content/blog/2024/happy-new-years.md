@@ -2,6 +2,7 @@
 title: 'Happy new years!'
 description: 'More updates and ramblings'
 pubDate: 'Jan 08 2024'
+heroImage: '/img/blog/2024/new-years-hero.png'
 ---
 
 # And here's to many more!

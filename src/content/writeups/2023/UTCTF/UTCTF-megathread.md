@@ -2,6 +2,7 @@
 title: "UTCTF 2023 Megathread"
 pubDate: "Mar 13 2023"
 description: Megathread for UTCTF 2023, contains mini writeups for most challenges
+heroImage: "/img/writeups/2023/UTCTF/utctf-hero.png"
 ---
 
 This past weekend I played in UTCTF 2023 by myself under [flocto solo run](https://utctf.live/teams/41).

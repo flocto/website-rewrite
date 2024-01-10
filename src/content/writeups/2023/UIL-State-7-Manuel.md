@@ -2,6 +2,7 @@
 title: "UIL State CS Packet #7: Manuel"
 pubDate: 'Feb 20 2023'
 description: "Solving system of linear equations with matrices"
+heroImage: "/img/writeups/2023/manuel-hero.png"
 ---
 
 I've been doing UIL practice to grind ~~definitely not because I was forced to~~ for state/regional.

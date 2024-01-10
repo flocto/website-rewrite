@@ -2,6 +2,7 @@
 title: 'CTFd Setup Guide'
 description: 'A guide to setting up a CTFd instance on DigitalOcean'
 pubDate: 'Mar 01 2023'
+heroImage: '/img/blog/2023/CTFd-setup/hero.png'
 ------
 
 **This guide is ported over from my original guide [here](https://github.com/flocto/The-Range).**

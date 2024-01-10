@@ -2,6 +2,7 @@
 title: "BucketCTF 2023 Megathread"
 pubDate: "Apr 12 2023"
 description: Megathread for BucketCTF 2023, with writeups for the challenges I solved.
+heroImage: "/img/writeups/2023/bucket-hero.png"
 ---
 
 Originally I was going to play alone but got drafted by my team so I ended up playing with them :joy:. Still, we ended up 6th place, could be better if we weren't also focusing MidnightSun and CursedCTF at the same time.
