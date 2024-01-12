@@ -1,0 +1,569 @@
+---
+title: "2023 NSA Codebreaker Writeup"
+pubDate: 'Jan 20 2024'
+description: "A writeup of all 9 tasks from the 2023 NSA Codebreaker Challenge."
+heroImage: "/img/writeups/2024/NSA-Codebreaker-23/nsa-codebreaker-hero.png"
+---
+
+import CollapsableCodeBlock from "../../../../components/CollapsableCodeBlock.astro";
+
+# Preamble
+Hello to everyone reading this! This is a collection of writeups for the 2023 NSA Codebreaker Challenge. 
+If you're wondering why this post is in 2024, the challenge was held in 2023 and extended to January 2024.
+
+Anyway, I had a ton of fun with these challenges (except 7), and I hope you enjoy reading these writeups as much as I enjoyed writing them!
+I'll go through each challenge and insert my own personal thoughts and comments along the way, so the writeups will be a bit more informal than usual.
+
+Also as a note, I won't give specific step-by-step instructions to solve each challenge, but moreso just an overview of the process I took.
+Anyway, I don't want to waste any more of your time, so let's get started!
+
+# Task 0
+Honestly they should use their CTF-Bot for other stuff than just email verification but that's just my personal opinion ¯\\\_(ツ)_/¯.
+Anyway there's nothing to say for this one, just authenticate through the bot and get the "flag".
+
+# Task 1 - Find the Unknown object 
+**General programming, database retrieval**
+> The US Coast Guard (USCG) recorded an unregistered signal over 30 nautical miles away from the continental US (OCONUS). NSA is contacted to see if we have a record of a similar signal in our databases. The Coast guard provides a copy of the signal data. Your job is to provide the USCG any colluding records from NSA databases that could hint at the object’s location. Per instructions from the USCG, to raise the likelihood of discovering the source of the signal, they need multiple corresponding entries from the NSA database whose geographic coordinates are within 1/100th of a degree. Additionally, record timestamps should be no greater than 10 minutes apart.
+>
+> Downloads:
+> 
+> - file provided by the USCG that contains metadata about the unknown signal (USCG.log)
+> - NSA database of signals (database.db)
+>
+> Prompt:
+>
+> - Provide database record IDs, one per line, that fit within the parameters specified above.
+
+The first real task. We're asked to retrieve database record IDs that match the given logfile below:
+<CollapsableCodeBlock filename="USCG.log">
+```json
+{
+    "coordinates": [
+        {
+            "latitude": "26.00768",
+            "longitude": "-83.33502"
+        }
+    ],
+    "timestamp": "02/20/2023, 13:34:59"
+}
+```
+</CollapsableCodeBlock>
+
+The database they give us is in the form of an SQLite 3 database, so we can simply connect with `sqlite3` and query the database on the given parameters.
+```sql
+SELECT location.*, timestamp.*
+FROM location
+JOIN timestamp ON location.id = timestamp.id
+WHERE CAST(location.latitude as decimal) >= 25.95768
+  AND CAST(location.latitude as decimal) <= 26.05768
+  AND CAST(location.longitude as decimal) >= -83.38502
+  AND CAST(location.longitude as decimal) <= -83.28502
+  AND timestamp.recDate = '02/20/2023';
+```
+```
+331|26.00298|-83.33024|0 m|331|13:39:22|02/20/2023
+555|26.00057|-83.33187|0 m|555|13:41:30|02/20/2023
+```
+This gives us our two answers, 331 and 555.
+
+# Task 2 - Extract the Firmware
+**Hardware analysis, Datasheets**
+> Thanks to your efforts the USCG discovered the unknown object by trilaterating the geo and timestamp entries of their record with the correlating entries you provided from the NSA databases. Upon discovery, the device appears to be a device with some kind of collection array used for transmitting and receiving. Further visual inspection shows the brains of this device to be reminiscent of a popular hobbyist computer. Common data and visual ports non-responsive; the only exception is a boot prompt output when connecting over HDMI. Most interestingly there is a 40pin GPIO header with an additional 20pin header. Many of these physical pins show low-voltage activity which indicate data may be enabled. There may be a way to still interact with the device firmware...
+> 
+> Find the correct processor datasheet, and then use it and the resources provided to enter which physical pins enable data to and from this device
+>
+> Hints:
+>
+> - Note: For the pinout.svg, turn off your application's dark mode if you're unable to see the physical pin labels (eg: 'P1', 'P60')
+> - The pinout.svg has two voltage types. The gold/tan is 3.3v, the red is 5v.
+> - The only additional resource you will need is the datasheet, or at least the relevant information from it
+>
+> Downloads:
+> 
+> - Rendering of debug ports on embedded computer (pinout.svg)
+> - image of device CPU (cpu.jpg)
+> - copy of display output when attempting to read from HDMI (boot_prompt.log)
+>
+> Prompts:
+> 
+> - Provide the correct physical pin number to power the GPIO header:
+> - Provide a correct physical pin number to ground the board:
+> - Provide the correct physical pin number for a UART transmit function:
+> - Provide the correct physical pin number for a UART receive function:
+
+This time, we're given two images and a boot log, and we need to identify a few key pins on the device.
+
+![Task 2 Image of CPU](/img/writeups/2024/NSA-Codebreaker-23/cpu.jpg)
+![Task 2 Pinout SVG](/img/writeups/2024/NSA-Codebreaker-23/pinout.svg)
+<CollapsableCodeBlock filename="boot.log">
+```plaintext
+***********************************************************
+*                                                                  *
+*                  Operation PITS Boot-up Banner                   *
+*                                                                  *
+********************************************************************
+device name: 
+Model: XYZ-1234
+Firmware Version: 1.0.0
+Boot Time: 1970-01-01 00:00:00
+Initializing collector...
+Loading configuration...
+Starting services...
+Booting up...
+Collector is online.
+Alternative Function Assignment  :  ALT3
+```
+</CollapsableCodeBlock>
+
+I'm honestly not too familiar with hardware at all, so I had to do quite a bit of research for this one. But first, starting with the power pin, since we are powering the GPIO header, we need 3.3v, which is the gold/tan color on the pinout.svg. 
+
+Physically, this is pin 51, since the physical pins on the 20 pin extension follow a zig zag pattern. (Notice how pin 41 and pin 42 are on opposite sides, naturally this pattern continues through the header, ending with pin 59 and 60)
+
+Next, any grey pin will work for the ground pin, so I just chose pin 52, which is right next to the 3.3v pin.
+
+For the UART transmit and recieve pins, we need to take a look at the log. The log tells us that the alternative function assignment is ALT3, which is important since these function assignments will vary what each pin does.
+
+Through some more research, I found [this datasheet](https://elinux.org/RPi_BCM2835_GPIOs) for the BCM2835, which while isn't exactly the same, is close enough for our purposes.
+
+On this datasheet, ALT3 has transmit and recieve on GPIO32 and 33 respectively. 
+Looking back at the pinout, we see that these are pin 53 and 54, so we have our answers (51, 52, 53, 54)!
+
+# Task 3 - Analyze the Firmware
+**Emulation**
+> Leveraging that datasheet enabled you to provide the correct pins and values to properly communicate with the device over UART. Because of this we were able to communicate with the device console and initiate a filesystem dump.
+> 
+> To begin analysis, we loaded the firmware in an analysis tool. The kernel looks to be encrypted, but we found a second-stage bootloader that loads it. The decryption must be happening in this bootloader. There also appears to be a second UART, but we don't see any data coming from it.
+> 
+> Can you find the secret key it uses to decrypt the kernel?
+> 
+> Tips:
+> 
+> - You can emulate the loader using the provided QEMU docker container. One download provides the source to build your own. The other is a pre-built docker image. See the README.md from the source download for steps on running it.
+> - Device tree files can be compiled and decompiled with `dtc`.
+> 
+> Downloads:
+> 
+> - U-Boot program loader binary (u-boot.bin)
+> - Recovered Device tree blob file (device_tree.dtb)
+> - Docker source files to build the QEMU/aarch64 image (cbc_qemu_aarch64-source.tar.bz2)
+> - Docker image for QEMU running aarch64 binaries (cbc_qemu_aarch64-image.tar.bz2)
+>
+> Prompt:
+>
+> - Enter the decryption key u-boot will use.
+
+After building the provided docker image, I followed the steps in the README with the netcat listeners and dboot, and eventually I got to the initial boot screen.
+
+```plaintext
+U-Boot 2022.04
+
+DRAM:  128 MiB
+Core:  42 devices, 11 uclasses, devicetree: board
+Flash: 32 MiB
+Loading Environment from Flash... *** Warning - bad CRC, using default environment
+
+"reg" resource not found
+probed pl011@9000000
+In:    pl011@9000000
+Out:   pl011@9000000
+Err:   pl011@9000000
+Net:   No ethernet found.
+Hit any key to stop autoboot:  0
+starting USB...
+No working controllers found
+USB is stopped. Please issue 'usb start' first.
+"reg" resource not found
+scanning bus for devices...
+
+Device 0: unknown device
+"reg" resource not found
+
+Device 0: unknown device
+starting USB...
+No working controllers found
+"reg" resource not found
+No ethernet found.
+No ethernet found.
+=>
+```
+
+Anyway, from here there was a lot of stuff I could try, but my first idea was loading the u-boot loader into a decompiler and seeing what I could find.
+
+Lots of mucking around later and staring at uninteresting code, eventually I found this snippet that seemed interesting:
+![Decompiled code setting `keyaddr` and `ivaddr` environment variables](/img/writeups/2024/NSA-Codebreaker-23/task-3-binja.png)
+
+A key and an iv you say? Well, going back to the booted device, we can use the `printenv` command to see the environment variables (found via `help`), and sure enough, there they are!
+```plaintext
+=> printenv
+printenv
+...
+ivaddr=467a0010
+kernel_addr_r=0x40400000
+keyaddr=467a0000
+...
+```
+
+Additionally, these two environment variables don't look like any of the other address variables (see the "0x" on kernel_addr_r?), so they definitely stood out more as well.
+
+But all we have is the address, how do you get the actual key?
+
+Well, with more combing through `help`, I found out about the [`md` command](https://u-boot.readthedocs.io/en/latest/usage/cmd/md.html).
+
+Using this, we can dump the memory at the given address, and sure enough, we get the key!
+```plaintext
+=> md.b 0x467a0000 0x10
+md.b 0x467a0000 0x10
+467a0000: f4 1b f6 ff 71 23 9d c4 3f 83 04 5e 45 3e 6b 84  ....q#..?..^E>k.
+```
+
+Submitting the hex `f41bf6ff71239dc43f83045e453e6b84` works and lets us move on.
+
+# Task 4 - Emulate the Firmware
+**Dynamic Reverse Engineering, Cryptography**
+> We were able to extract the device firmware, however there isn't much visible > on it. All the important software might be protected by another method.
+> 
+> There is another disk on a USB device with an interesting file that looks to be an encrypted filesystem. Can you figure out how the system decrypts and mounts it? Recover the password used to decrypt it. You can emulate the device using the QEMU docker container from task 3.
+>
+> Downloads:
+> 
+> - main SD card image (sd.img.bz2)
+> - USB drive image (usb.img.bz2)
+> - Linux kernel (kernel8.img.bz2)
+> - Device tree blob file for emulation (bcm2710-rpi-3-b-plus.dtb.bz2)
+>
+> Prompt:
+> 
+> - Enter the password used to decrypt the filesystem.
+
+This time, we can actually work with the decrypted full image. Booting up the image following the README again, I noticed this interesting part near the end of the booting sequence
+```plaintext
+cryptsetup: opening /opt/part.enc
+[   14.426821] mmc1: Timeout waiting for hardware interrupt.
+udhcpc: broadcasting discover
+udhcpc: broadcasting discover
+udhcpc: no lease, forking to background
+[   24.623905] mmc1: Timeout waiting for hardware interrupt.
+[   35.888629] cam-dummy-reg: disabling
+No key available with this passphrase.
+mount: mounting /dev/mapper/part on /agent failed: No such file or directory
+```
+Seems to be some sort of decryption, so probably something we should look out for.
+
+Additionally, on the actual device itself, we have a few interesting folders, `/agent`, which is empty for now and `/private`:
+```plaintext
+~ # ls -al /agent
+total 8
+drwxr-xr-x    2 root     0             4096 Sep 28  2023 .
+drwxr-xr-x   21 root     0             4096 Jan  1 00:01 ..
+
+~ # ls -al /private
+total 40
+drwxr-xr-x    3 root     0             4096 May 15  2022 .
+drwxr-xr-x   21 root     0             4096 Jan  1 00:01 ..
+-rw-------    1 root     0               96 May 15  2022 ecc_p256_private.bin
+-rw-------    1 root     0               64 May 15  2022 ecc_p256_pub.bin
+-rw-------    1 root     0               36 May 15  2022 id.txt
+-rw-------    1 root     0              387 May 15  2022 id_ed25519
+drw-------    2 root     0            16384 May 15  2022 lost+found
+```
+We also have some interesting files in `/opt`:
+```plaintext
+~ # ls -al /opt
+total 28740
+drwxr-xr-x    4 root     0             4096 May 15  2022 .
+drwxr-xr-x   21 root     0             4096 Jan  1 00:01 ..
+drwx------    2 root     0             4096 May 15  2022 .ssh
+-rw-r--r--    1 root     0               11 May 15  2022 hostname
+drwx------    2 root     0            16384 May 15  2022 lost+found
+-rwxrwx---    1 root     0              443 May 15  2022 mount_part
+-rw-r--r--    1 root     0         29360128 Jan  1 00:15 part.enc
+```
+
+`mount_part` is especially interesting, since it seems like a bash script that is mounting an encrypted partition. 
+```bash
+#!/bin/sh
+
+SEC_DRIVE=$1
+SEC_MOUNT=$2
+ENC_PARTITION=$3
+ENC_MOUNT=$4
+
+[ ! -e $ENC_PARTITION ] && { echo "encrypted partition not found"; exit 1; }
+
+mkdir -p $SEC_MOUNT
+mount $SEC_DRIVE $SEC_MOUNT
+NAME=`hostname`
+ID=`cat /private/id.txt`
+
+DATA="${NAME}${ID:0:3}"
+echo "cryptsetup: opening $ENC_PARTITION"
+echo -n $DATA | openssl sha1 | awk '{print $NF}' | cryptsetup open $ENC_PARTITION part
+mkdir -p $ENC_MOUNT
+mount /dev/mapper/part $ENC_MOUNT
+```
+
+We have some data that gets fed into a sha1 hash, then gets fed into `cryptsetup open` as the password. Since we need to find the password for the encrypted partition, this is probably what we're looking for.
+
+Additionally, in `/etc/init.d`, we have this script that runs on boot:
+```bash
+#!/bin/sh
+
+mount -t proc none /proc
+mount -t sysfs none /sys
+/sbin/mdev -s
+mount -a
+
+for drv in /drivers/*.ko; do
+  insmod $drv
+done
+
+[ -s /etc/hostname ] && hostname `cat /etc/hostname`
+
+PRIV_IP=10.101.255.254
+
+ifconfig lo 127.0.0.1 netmask 255.0.0.0
+ifconfig lo up
+ifconfig usb0 $PRIV_IP netmask 255.255.0.0
+ifconfig usb0 up
+
+ifconfig usb1 up
+udhcpc -i usb1 -s /etc/udhcpc.script -b &
+
+/sbin/dropbear -p $PRIV_IP:22
+
+/opt/mount_part /dev/sda2 /private /opt/part.enc /agent
+(/agent/start >/dev/null 2>&1) &
+```
+This confirms that `mount_part` is the script we should be looking at for the password.
+
+Luckily, we have the `NAME` variable easily, by just running `hostname`.
+```plaintext
+/opt # hostname
+lowlythyme
+```
+
+However, we don't have access to the `/private/id.txt` file, as it seems to be wiped on boot.
+```plaintext
+/opt # xxd /private/id.txt
+00000000: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+00000010: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+00000020: 0000 0000                                ....
+```
+
+I got really lucky on this next step and just guessed that the 3 characters taken from ID would all be digits (seriously idk how I did that :sob:) and brute forced them using a simple script to generate all 3 digit passwords.
+```py
+import string
+import itertools
+from hashlib import sha1
+
+base = "lowlythyme"
+
+with open('dump.txt', 'w') as f:
+    # for c in itertools.product(string.ascii_letters + string.digits + string.punctuation, repeat=3):
+    for c in itertools.product(string.digits, repeat=3):
+        s = base + ''.join(c)
+        s = sha1(s.encode()).hexdigest()
+        f.write(s + '\n')
+```
+Then I just ran them through [bruteforce-luks](https://github.com/glv2/bruteforce-luks), and sure enough, eventually I got the password!
+```plaintext
+$ bruteforce-luks -f test.txt part.enc
+Warning: using dictionary mode, ignoring options -b, -e, -l, -m and -s.
+
+Tried passwords: 0
+Tried passwords per second: 0.000000
+Last tried password: 6597cb1833a77f7100e8bbb876c96ef767e687fb
+
+Password found: 6597cb1833a77f7100e8bbb876c96ef767e687fb
+```
+This corresponded with `lowlythyme862`, so that was the final password.
+
+# Task 5 - Follow the Data Part 1
+**Reverse Engineering, Forensics**
+> Based on the recovered hardware the device seems to to have an LTE modem and SIM card implying it connects to a GSM telecommunications network. It probably exfiltrates data using this network. Now that you can analyze the entire firmware image, determine where the device is sending data.
+> 
+> Analyze the firmware files and determine the IP address of the system where the device is sending data.
+>
+> Prompt:
+>
+> - Enter the IP address (don't guess)
+
+So now that we have the password, we have to actually mount the encrypted partition.
+
+Running the mount_part script with `id.txt` filled out properly, we can get the decrypted partition mounted on `/agent`:
+```plaintext
+# /opt/mount_part /dev/sda2 /private /opt/part.enc /agent
+mount: mounting /dev/sda2 on /private failed: Device or resource busy
+cryptsetup: opening /opt/part.enc
+[ 1639.373125] EXT4-fs (dm-0): mounting ext3 file system using the ext4 subsystem
+[ 1639.608315] EXT4-fs (dm-0): recovery complete
+[ 1639.629163] EXT4-fs (dm-0): mounted filesystem with ordered data mode. Opts: (null)
+
+# ls -al /agent/
+total 19944
+drwxr-xr-x    3 root     0             4096 May 15  2022 .
+drwxr-xr-x   21 root     0             4096 Jan  1 00:01 ..
+-rwxr-xr-x    1 root     0           891224 May 15  2022 agent
+-rw-r--r--    1 root     0                0 Jan  1 00:06 agent_restart
+-rw-r-----    1 root     0              567 May 15  2022 config
+-rwx--x--x    1 root     0          7975035 May 15  2022 diagclient
+-rwxr-xr-x    1 root     0         11483487 May 15  2022 dropper
+drwx------    2 root     0            16384 May 15  2022 lost+found
+-rwxrwx---    1 root     0              396 May 15  2022 start
+```
+
+The three important files here are `agent`, `diagclient`, and `dropper`, all of which are binaries part of the C2 process.
+
+Now, the intention of the challenge is to reverse the individual binaries and figure out what's going on, but when I was solving, I didn't feel like looking at them in depth at the time (which is a decision that will hurt later but for now its fine).
+
+But since the category of the task was labeled forensics, I thought it would be interesting to extract from the binaries and see if there were any embedded files that could be helpful.
+
+However, when I extracted from the `dropper` binary, it generated a very interesting file:
+```plaintext
+$ binwalk -e dropper
+
+DECIMAL       HEXADECIMAL     DESCRIPTION
+--------------------------------------------------------------------------------
+0             0x0             ELF, 64-bit LSB executable, version 1 (SYSV)
+...
+11483298      0xAF38A2        bzip2 compressed data, block size = 900k
+
+$ ls _dropper.extracted/
+AF38A2
+
+$ file _dropper.extracted/AF38A2
+_dropper.extracted/AF38A2: ASCII text
+```
+
+And lo and behold, this has all the information we need.
+```yml
+database:
+  collection: files
+  database: snapshot-06ab44e88a24
+  url: mongodb://maintenance:fe2d7709507a0e@100.108.114.44:27017/?authSource=snapshot-06ab44e88a24
+server:
+  directory: /tmp/upload
+```
+
+Submitting the IP `100.108.114.44` works, meaning the binaries are exfiltrating data to this mongodb server.
+
+# Task 6 - Follow the Data Part 2
+**Forensics, Databases, Exploitation**
+> While you were working, we found the small U.S. cellular provider which issued the SIM card recovered from the device: Blue Horizon Mobile.
+> 
+> As advised by NSA legal counsel we reached out to notify them of a possible compromise and shared the IP address you discovered. Our analysts explained that sophisticated cyber threat actors may use co-opted servers to exfiltrate data and Blue Horizon Mobile confirmed that the IP address is for an old unused database server in their internal network. It was unmaintained and (unfortunately) reachable by any device in their network.
+> 
+> We believe the threat actor is using the server as a "dead drop", and it is the only lead we have to find them. Blue Horizon has agreed to give you limited access to this server on their internal network via an SSH "jumpbox". They will also be sure not to make any other changes that might tip off the actor. They have given you the authority to access the system, but unfortunately they could not find credentials. So you only have access to the database directly on TCP port 27017
+> 
+> Use information from the device firmware, and (below) SSH jumpbox location and credentials to login to the database via an SSH tunnel and discover the IP address of the system picking up a dead drop. Be patient as the actor probably only checks the dead drop periodically. Note the jumpbox IP is 100.127.0.2 so don't report yourself by mistake
+> 
+> Downloads:
+> 
+> - SSH host key to authenticate the jumpbox (optional) (jumpbox-ssh_host_ecdsa_key.pub)
+> - SSH private key to authenticate to the jumpbox: `user@external-support.bluehorizonmobile.com` on TCP port 22 (jumpbox.key)
+> 
+> Prompt:
+> 
+> - Enter the IP address (don't guess)
+
+Now we have access to the attacker's mongodb server.
+
+After messing a bit to actually install `mongosh` and setting up the jumpbox properly, I was able to connect to the database:
+```plaintext
+test> show dbs
+snapshot-06ab44e88a24  200.00 KiB
+
+test> use snapshot-06ab44e88a24
+switched to db snapshot-06ab44e88a24
+
+snapshot-06ab44e88a24> show collections
+files
+```
+
+This part is a bit scuffed, but basically we know that there's another IP that's accessing this database and retrieving the files.
+
+So if we have some way to track what IPs access the database, we can catch the attacker.
+
+Thankfully, we do have a way to track this! The [database profiler](https://www.mongodb.com/docs/manual/tutorial/manage-the-database-profiler/) gives us a way to track all the queries that are run on the database.
+
+However, if we try to set the profiler level to 2, we get an error:
+```plaintext
+snapshot-06ab44e88a24> db.setProfilingLevel(2)
+MongoServerError: not authorized on snapshot-06ab44e88a24 to execute command { profile: 2, lsid: { id: UUID("75123268-0a2c-48b1-951c-197f5e8d0bac") }, $db: "snapshot-06ab44e88a24" }
+```
+
+This means our user isn't authorized to run this command, so we need to find a way to escalate our privileges.
+
+If we list the users in the database, we can see our current `maintenance` user:
+```plaintext
+snapshot-06ab44e88a24> show users
+[
+  {
+    _id: 'snapshot-06ab44e88a24.maintenance',
+    userId: new UUID("2c03485a-f153-4bf1-92ac-dd0e9af0b863"),
+    user: 'maintenance',
+    db: 'snapshot-06ab44e88a24',
+    roles: [
+      { role: 'readWrite', db: 'snapshot-06ab44e88a24' },
+      { role: 'userAdmin', db: 'snapshot-06ab44e88a24' }
+    ],
+    customData: { callback: 1 },
+    mechanisms: [ 'SCRAM-SHA-1', 'SCRAM-SHA-256' ]
+  }
+]
+```
+
+Interesting, we have the `userAdmin` role, which means we can create new users with any role we want.
+
+So all we have to do is make a new user that can actually run `setProfilingLevel` and we're good to go.
+
+```plaintext
+db.createUser(
+  {
+    user: "test",
+    pwd: "testing123",  
+    roles: [
+      { role: 'userAdmin', db: 'snapshot-06ab44e88a24' },
+      { role: 'dbOwner', db: 'snapshot-06ab44e88a24' },
+      { role: 'dbAdmin', db: 'snapshot-06ab44e88a24' },
+      { role: 'read', db: 'snapshot-06ab44e88a24' },
+      { role: 'readWrite', db: 'snapshot-06ab44e88a24' },
+      { role: 'enableSharding', db: 'snapshot-06ab44e88a24' }
+    ]
+  }
+)
+```
+
+Now we can log in as our new user, set the profiling level to 2, and profit!
+```plaintext
+snapshot-06ab44e88a24> db.auth('test', 'testing123')
+{ ok: 1 }
+
+snapshot-06ab44e88a24> db.setProfilingLevel(2)
+{ was: 0, slowms: 1, sampleRate: 1, ok: 1 }
+```
+After waiting a bit, the other IP will query the database and show up in the profiler:
+```plaintext
+snapshot-06ab44e88a24> db.system.profile.find()
+...
+{
+    op: 'query',
+    ns: 'snapshot-06ab44e88a24.files',
+    command: {
+      find: 'files',
+      filter: {},
+      lsid: { id: new UUID("372bc52b-3ef8-45c7-b782-0848e64a3808") },
+      '$db': 'snapshot-06ab44e88a24'
+    },
+    ...
+    ts: ISODate("2023-09-29T18:52:19.625Z"),
+    client: '100.94.3.187',
+    allUsers: [ { user: 'maintenance', db: 'snapshot-06ab44e88a24' } ],
+    user: 'maintenance@snapshot-06ab44e88a24'
+}
+...
+```
+The `client` key is the IP we're looking for, so we can submit `100.94.3.187` and move on!
+
+# Task 7
+Coming soon! (I'm still working on this one give me time to sleep please)
