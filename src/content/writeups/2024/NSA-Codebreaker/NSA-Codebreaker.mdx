@@ -378,7 +378,7 @@ Password found: 6597cb1833a77f7100e8bbb876c96ef767e687fb
 ```
 This corresponded with `lowlythyme862`, so that was the final password.
 
-As it turns out, the correct intention was indeed to bruteforce, but instead of base 10 digits, it was hex digits. I just got really lucky that the 3 characters used happened to be all digits.
+As it turns out, the correct intention was indeed to bruteforce, but instead of base 10 digits, it was hex digits, as `id.txt` contained a UUID. I just got really lucky that the 3 characters used in my case all happened to be digits.
 
 Additionally, it was possible to use `hashcat` to extract the hash and crack it that way, which would've been much faster.
 
@@ -1315,6 +1315,8 @@ After running and waiting a bit, we get our two IPs!
 100.67.135.8
 100.76.16.177
 ```
+
+Honestly, this challenge isn't horribly difficult, but my main issue with it is that I really don't like the jump from finding the JSON types to just guessing that `start_time` had path injection. There was no leadup at all and it just seemed super guessy that it would work.
 
 # Task 8 - Decrypt the Comms
 **Reverse Engineering, Cryptography**
