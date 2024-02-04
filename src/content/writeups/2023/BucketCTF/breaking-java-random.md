@@ -734,11 +734,11 @@ Remember how the RNG for `java.util.Random` is defined? It's a [linear congruent
 
 $$
 \begin{aligned}
-&m = \text{0x5DEECE66D}& \\\\
-&b = \text{0xB}& \\\\
-&s = \text{initial seed}& \\\\
-&\text{For every call to next(bits)} \\\\
-&s = ms + b \mod 2^{48} \\\\
+&m = \text{0x5DEECE66D}& \\
+&b = \text{0xB}& \\
+&s = \text{initial seed}& \\
+&\text{For every call to next(bits)} \\
+&s = ms + b \mod 2^{48} \\
 &\text{return } s >> (48 - \text{bits})
 \end{aligned}
 $$
@@ -749,10 +749,10 @@ Mathematically, this can be done as long as we can find $m^{-1}$ in the modulus 
 
 $$
 \begin{aligned}
-s_1 = m{s_0} + b \mod 2^{48} \\\\
-s_1 - b = m{s_0} \mod 2^{48} \\\\
-m' = m^{-1} \mod 2^{48} \\\\
-\frac{s_1 - b}{m} = s_0 \mod 2^{48} \\\\
+s_1 = m{s_0} + b \mod 2^{48} \\
+s_1 - b = m{s_0} \mod 2^{48} \\
+m' = m^{-1} \mod 2^{48} \\
+\frac{s_1 - b}{m} = s_0 \mod 2^{48} \\
 m'(s_1 - b) = s_0 \mod 2^{48}
 \end{aligned}
 $$

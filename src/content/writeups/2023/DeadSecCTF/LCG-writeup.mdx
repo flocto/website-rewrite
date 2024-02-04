@@ -94,43 +94,43 @@ First we need to recover the modulus of the LCG. To do this, we can use a simple
 Let's set up the following equations and define $S_n$ as the $n$th output of the LCG, as well as $a$ as the multiplier, $c$ as the increment, and $m$ as the modulus:
 
 $$
-\begin{align}
-S_n &= aS_{n-1} + c &\mod m \\\\
-T_n &= S_{n+1} - S_n &\mod m\\\\
-\\\\
-T_0 &= S_1 - S_0 \\\\
-T_0 &= aS_0 + c - S_0 &\mod m \\\\
-T_1 &= S_2 - S_1 \\\\
-T_1 &= aS_1 + c - S_1 &\mod m \\\\
-\end{align}
+\begin{align*}
+S_n &= aS_{n-1} + c &\mod m \\
+T_n &= S_{n+1} - S_n &\mod m    \\
+\\
+T_0 &= S_1 - S_0 \\
+T_0 &= aS_0 + c - S_0 &\mod m \\
+T_1 &= S_2 - S_1 \\
+T_1 &= aS_1 + c - S_1 &\mod m \\
+\end{align*}
 $$
 
 Between consecutive elements in $T$, we can notice this pattern:
 
 $$
-\begin{align}
-T_n &= aS_n + c - S_n &\mod m \\\\
-T_n &= a(aS_{n-1} + c) + c - (aS_{n-1} + c) &\mod m \\\\
-T_n &= a^2S_{n-1} + ac + c - aS_{n-1} - c &\mod m \\\\
-T_n &= a(aS_{n-1} + c - S_{n-1}) &\mod m \\\\
-T_n &= aT_{n-1} &\mod m \\\\
-\end{align}
+\begin{align*}
+T_n &= aS_n + c - S_n &\mod m \\
+T_n &= a(aS_{n-1} + c) + c - (aS_{n-1} + c) &\mod m \\
+T_n &= a^2S_{n-1} + ac + c - aS_{n-1} - c &\mod m \\
+T_n &= a(aS_{n-1} + c - S_{n-1}) &\mod m \\
+T_n &= aT_{n-1} &\mod m \\
+\end{align*}
 $$
 
 Meaning that $T$ forms its own LCG with the same modulus and multiplier but no increment. Witht this new LCG, we can now easily find the modulus by just multiplying different items in $T$ to get differences that are $k\cdot m$ for some integer $k$.
 
 $$
-\begin{align}
-T_1 &= aT_0 &\mod m \\\\
-T_2 &= aT_1 &\mod m \\\\
-\\\\
-T_1^2 &= a^2T_0^2 &\mod m \\\\
-T_2T_0 &= (aT_1)(T_0) \\\\
-&= (a(aT_0))T_0 \\\\
-&= a^2T_0^2 &\mod m \\\\
-\\\\
-&\boxed{T_1^2 - T_2T_0 = 0 \mod m = k\cdot m}& \\\\
-\end{align}
+\begin{align*}
+T_1 &= aT_0 &\mod m \\
+T_2 &= aT_1 &\mod m \\
+\\
+T_1^2 &= a^2T_0^2 &\mod m \\
+T_2T_0 &= (aT_1)(T_0) \\
+&= (a(aT_0))T_0 \\
+&= a^2T_0^2 &\mod m \\
+\\
+&\boxed{T_1^2 - T_2T_0 = 0 \mod m = k\cdot m}& \\
+\end{align*}
 $$
 
 If we gather enough of these, we can just `gcd` them together to find the modulus. Unfortunately, the output is chosen so that we get a multiple of the modulus, but since we know the number has to be around 128 bits, we can easily guess that it is a factor of $5$ too large.
@@ -158,10 +158,10 @@ Let's go back to the $T$ LCG earlier, since the multiplier is the only unknown t
 We should be able to easily recover $a$ like so:
 
 $$
-\begin{align}
-T_1 &= aT_0 &\mod m \\\\
-a &= T_1T_0^{-1} &\mod m \\\\
-\end{align}
+\begin{align*}
+T_1 &= aT_0 &\mod m \\
+a &= T_1T_0^{-1} &\mod m \\
+\end{align*}
 $$
 
 But if we try this out in Python, we get an error...
@@ -186,12 +186,12 @@ ValueError: base is not invertible for the given modulus
 Unfortunately, our $T$ values aren't coprime with $m$, so we can't just take the modular inverse. Thankfully, we can still recover $a$ very simply by the following identity:
 
 $$
-\begin{align}
-g &= gcd(T_1, T_0, m) \\\\
-T_1 &= aT_0 &\mod m \\\\
-\frac{T_1}{g} &= a\frac{T_0}{g} &\mod \frac{m}{g} \\\\
-a &= \frac{T_1}{g}/\frac{T_0}{g} &\mod \frac{m}{g} \\\\
-\end{align}
+\begin{align*}
+g &= gcd(T_1, T_0, m) \\
+T_1 &= aT_0 &\mod m \\
+\frac{T_1}{g} &= a\frac{T_0}{g} &\mod \frac{m}{g} \\
+a &= \frac{T_1}{g}/\frac{T_0}{g} &\mod \frac{m}{g} \\
+\end{align*}
 $$
 
 (Just a note, if $a$ is too small after this calculation, we can just add $m/g$ to it until it properly satisfies the $T$ LCG)
@@ -217,10 +217,10 @@ print(A, T1 == T0 * A % M)
 Now the last part is the easiest, all we have to do is
 
 $$
-\begin{align}
-S_1 &= aS_0 + c &\mod m \\\\
-c &= S_1 - aS_0 &\mod m \\\\
-\end{align}
+\begin{align*}
+S_1 &= aS_0 + c &\mod m \\
+c &= S_1 - aS_0 &\mod m \\
+\end{align*}
 $$
 
 ```python
@@ -267,11 +267,11 @@ print(q_low, q_low.bit_length())
 Now we have the low bits of both primes, we can set up a bivariate equation which should give us the high bits like so:
 
 $$
-\begin{align}
-k &= 384 \text{(offset for high bits)} \\\\
-\\\\
-f &= (p_{low} + p_{high}2^k)(q_{low} + q_{high}2^k) - n \\\\
-\end{align}
+\begin{align*}
+k &= 384 \text{(offset for high bits)} \\
+\\
+f &= (p_{low} + p_{high}2^k)(q_{low} + q_{high}2^k) - n \\
+\end{align*}
 $$
 
 But actually, because these equations are over the integers, we can use the `monic` and `small_roots` functions in SageMath to 

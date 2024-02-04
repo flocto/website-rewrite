@@ -1731,15 +1731,14 @@ Other than that, the challenge itself was also really open-ended, leading to sev
 For example, you could [invert the circuit](https://qiskit.org/documentation/stubs/qiskit.circuit.QuantumCircuit.inverse.html#qiskit.circuit.QuantumCircuit.inverse) entirely, and just put that at the end of your own circuit while still creating the desired statevector beforehand. This cancels out the server's circuit like so:
 
 $$
-\begin{align}
+\begin{aligned}
 M &= \text{matrix representation of the circuit} \\
-T &= \text{target statevector} \\
-\\newline
+T &= \text{target statevector} \\\\
 M^{-1} &= \text{inverse of M} \\
 M^{-1}M T &= X \ \ \text{(this is the entire circuit)}\\
 IT &= X \ \ \text{(since } M^{-1}M = I\text{)}\\
 X &= T
-\end{align}
+\end{aligned}
 $$
 
 This method is a bit different since instead of modifying $X$ to become $T$ like I did in my original solution, we modify our entire circuit to cancel out $M$ while still creating X beforehand (but as you can see the math results in the same statevector).

@@ -390,9 +390,9 @@ Leaking $(p-2) (q-2)$ actually leaks $p + q$ through simple algebra:
 
 $$ 
 \begin{aligned}
-(p-2)(q-2) &= pq - 2p - 2q + 4 \\\\
-n &= pq \\\\
-n - (p-2)(q-2) &= 2p + 2q - 4& \\\\
+(p-2)(q-2) &= pq - 2p - 2q + 4 \\
+n &= pq \\
+n - (p-2)(q-2) &= 2p + 2q - 4& \\
 \frac{n - ((p-2)(q-2) - 4)}{2} &= p + q
 \end{aligned}
 $$
@@ -400,13 +400,13 @@ $$
 And given $p+q$, we can easily solve for $p$ and $q$ individually through the quadratic formula:
 $$ 
 \begin{aligned}
-s &= p + q \\\\
-n &= pq \\\\
-\\\\
-&\text{Create quadratic with primes as roots} \\\\
-f(x) &= (x - p)(x - q) \\\\
-f(x) &= x^2 - (p + q)x + pq \\\\
-f(x) &= x^2 - sx + n \\\\
+s &= p + q \\
+n &= pq \\
+\\
+&\text{Create quadratic with primes as roots} \\
+f(x) &= (x - p)(x - q) \\
+f(x) &= x^2 - (p + q)x + pq \\
+f(x) &= x^2 - sx + n \\
 p,q &= \frac{s \pm \sqrt{s^2 - 4n}}{2}
 \end{aligned}
 $$
