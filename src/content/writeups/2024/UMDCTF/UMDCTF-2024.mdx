@@ -1078,6 +1078,24 @@ Notice how the first 8 characters are the same, as well as the last 6. This corr
 This means that at some point, our input is being shuffled around. 
 
 The next step requires a bit of intuition. We know we have 7 correct characters, and 4 correct at the start and 3 in the back. By inputting in more guesses, we can see that it takes one character at a time, puts it at the start, then takes the next character and prepends it to the end.
+```
+iex(1)> Flavors.main
+Flag: UMDCTF{AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}
+AD38A5972EA92EA2A928A22428222FAA2D312C312FABAA14A22824A828A9A22EA92E3122A1312C312DAA2F222CA824
+:ok
+iex(2)> Flavors.main
+Flag: UMDCTFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}
+AD38A5312EA92EA2A928A22428222FAA2D312C312FABAA14A22824A828A9A22EA92E3122A1312C312DAA2F222CA824
+:ok
+iex(3)> Flavors.main
+Flag: AMDCTF{AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}
+2C38A5972EA92EA2A928A22428222FAA2D312C312FABAA14A22824A828A9A22EA92E3122A1312C312DAA2F222CA824
+:ok
+iex(4)> Flavors.main
+Flag: UADCTF{AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}
+AD38A5972EA92EA2A928A22428222FAA2D312C312FABAA14A22824A828A9A22EA92E3122A1312C312DAA2F222CA828
+:ok
+```
 
 Here is a reimplementation in Python:
 ```python
