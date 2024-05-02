@@ -25,5 +25,8 @@
     "remark-toc": "^9.0.0",
     "sharp-ico": "^0.1.5",
     "typescript": "^5.3.3"
+  },
+  "devDependencies": {
+    "@fec/remark-a11y-emoji": "^4.0.2"
   }
 }

@@ -3,6 +3,7 @@ import rehypeToc from "rehype-toc";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
 import remarkGemoji from 'remark-gemoji'
+import a11yEmoji from '@fec/remark-a11y-emoji';
 import { rehypeHeadingIds } from "@astrojs/markdown-remark";
 import rehypeExternalLinks from "rehype-external-links";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
@@ -15,6 +16,7 @@ export default {
         [remarkToc, { tight: true, ordered: true }],
         remarkMath,
         remarkGemoji,
+        a11yEmoji,
     ],
     rehypePlugins: [
         rehypeHeadingIds,
