@@ -1,0 +1,104 @@
+---
+title: "UIUCTF 2024 Writeups"
+pubDate: "July 5 2024"
+description: "Some misc and rev writeups for UIUCTF 2024"
+heroImage: "/img/writeups/2024/uiuctf-24/uiuctf-24-hero.png"
+---
+
+import CollapsableCodeBlock from "../../../../components/CollapsableCodeBlock.astro";
+
+How's it been? Recently, I played UIUCTF with Project Sekai instead of ARESx, but I was also at DiceCTF Finals on vacation, so I didn't get much done. Still, I managed to solve a few of the misc and rev challenges, so here are their writeups. 
+
+## Misc
+I helped in solving `astea` and `push and pickle` as well, but since I didn't fully solve them, I won't be covering them here.
+
+### Slot Machine
+> 453 Passengers / 76 Solves
+> Author: Jake
+> 
+> We have onboard entertainment! Try your luck on our newly installed slot machine.
+> 
+> `ncat --ssl slot-machine.chal.uiuc.tf 1337`
+
+We have one attachment, a simple `chal.py`:
+<CollapsableCodeBlock filename="chal.py">
+```python
+from hashlib import sha256
+
+hex_alpha = "0123456789abcdef"
+
+print("== Welcome to the onboard slot machine! ==")
+print("If all the slots match, you win!")
+print("We believe in skill over luck, so you can choose the number of slots.")
+print("We'll even let you pick your lucky number (little endian)!")
+
+lucky_number = input("What's your lucky (hex) number: ").lower().strip()
+lucky_number = lucky_number.rjust(len(lucky_number) + len(lucky_number) % 2, "0")
+if not all(c in hex_alpha for c in lucky_number):
+    print("Hey! That's not a hex number! -999 luck!")
+    exit(1)
+hash = sha256(bytes.fromhex(lucky_number)[::-1]).digest()[::-1].hex()
+
+length = min(32, int(input("How lucky are you feeling today? Enter the number of slots: ")))
+
+print("=" * (length * 4 + 1))
+print("|", end="")
+for c in hash[:length]:
+    print(f" {hex_alpha[hex_alpha.index(c) - 1]} |", end="")
+print("\n|", end="")
+for c in hash[:length]:
+    print(f" {c} |", end="")
+print("\n|", end="")
+for c in hash[:length]:
+    print(f" {hex_alpha[hex_alpha.index(c) - 15]} |", end="")
+print("\n" + "=" * (length * 4 + 1))
+
+if len(set(hash[:length])) == 1:
+    print("Congratulations! You've won:")
+    flag = open("flag.txt").read()
+    print(flag[:min(len(flag), length)])
+else:
+    print("Better luck next time!")
+```
+</CollapsableCodeBlock>
+
+There's a lot of messy logic in here we can ignore, but the main thing is that we control some input that is `sha256` hashed, then the trailing hex digits are used to determine if we "win" the slot machine.
+
+So, the goal is to find some input that creates a hash with a lot of the same trailing hex digits. We can deal with the encoding issues later, but for now, we need to find some pattern that satisfies this.
+
+The first thing that came to mind for me was [Bitcoin hashes](https://en.bitcoin.it/wiki/Block_hashing_algorithm). Bitcoin hashes are SHA256 hashes that have a lot of leading zeros, and the more leading zeros, the more difficult it is to find. 
+
+Fortunately, a quick google search shows us quite a few hashes with lots of 0s [here](https://bitcoin.stackexchange.com/questions/65478/which-is-the-smallest-hash-that-has-ever-been-hashed).
+
+We can take this [known block with 24 zeroes](https://mempool.space/block/0000000000000000000000005d6f06154c8685146aa7bc3dc9843876c9cefd0f), extract the block [like so](https://bitcoin.stackexchange.com/questions/102236/how-to-get-the-list-of-blockheader), and then send it over to the server for 24 characters of the flag. As it turns out, this is enough!
+
+```bash
+curl 'https://blockchain.info/rawblock/756951?format=hex' | head -c 160 > block.txt
+```
+<CollapsableCodeBlock filename="solve.py">
+```python
+from pwn import remote
+from hashlib import sha256
+from base64 import b64decode
+from Crypto.Util.number import long_to_bytes, bytes_to_long
+
+def send_data(hash, n):
+    # ncat --ssl slot-machine.chal.uiuc.tf 1337
+    r = remote("slot-machine.chal.uiuc.tf", 1337, ssl=True)
+
+    r.sendline(hash)
+    r.sendline(str(n).encode())
+    print(r.recvall())
+
+
+k = open('block.txt').read()
+k = bytes.fromhex(k)
+hash = sha256(sha256(k).digest()).digest().hex()
+n = 24
+print(hash, set(hash[-n:]))
+send_data(hash, n)
+```
+</CollapsableCodeBlock>
+(Unfortunately I don't remember what the flag was and remote is down, but this does get the flag)
+
+## Rev
