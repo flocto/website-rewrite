@@ -5,7 +5,7 @@ description: Some web practice I did recently. (like very recently)
 heroImage: "/img/writeups/2023/upsolving/web-upsolve-hero.png"
 ---
 
-import CollapsableCodeBlock from "../../../../components/CollapsableCodeBlock.astro";
+import CollapseBlock from "../../../../components/CollapseBlock.astro";
 
 I've been wanting to take a look back at web for a while now, since I felt like my progress has stagnated a bit. Two recent challenges, [sanity from AmateursCTF 2023](https://ctftime.org/task/25859) and [amogus from ImaginaryCTF 2023](https://2023.imaginaryctf.org/Challenges), caught my eye.
 
@@ -25,7 +25,7 @@ Anyway, let's first look at `sanity` from `amateursCTF`:
 
 Looking at the source code, we don't have a whole lot going on:
 
-<CollapsableCodeBlock 
+<CollapseBlock 
 filename="sanes.ejs"
 >
 
@@ -100,9 +100,9 @@ filename="sanes.ejs"
 </html>
 ```
 
-</CollapsableCodeBlock>
+</CollapseBlock>
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="index.js"
 >
 ```js
@@ -195,7 +195,7 @@ console.log(`Example app listening on port ${port}`);
 });
 
 ````
-</CollapsableCodeBlock>
+</CollapseBlock>
 `index.js` has nothing too interesting, just a typical note XSS setup where we can submit a title and body, then report the note for the admin bot to see and get XSS'd. Flag is stored inside of admin's cookies, so we just need to extract those.
 
 However, looking at `sanes.ejs`, there is a few parts of interest:
@@ -472,7 +472,7 @@ There's a lot of files to go through here, so here are the most important ones:
 
 First, we have two services, `auth` and `mail` (condensed into one file here). Note that `auth` has a set CSP header:
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="nginx.conf"
 >
 
@@ -500,10 +500,10 @@ server {
 }
 ```
 
-</CollapsableCodeBlock>
+</CollapseBlock>
 For the actual `auth` app, we have a simple Flask server that uses a SQLAlchemy Database:
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="app.py"
 >
 ```python
@@ -561,11 +561,11 @@ app.run("0.0.0.0", port=8081)
 
 ```
 
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 As for `mail`, we have a Flask mail inbox that also contains the flag inside the `admin` mailbox. If we're logged in as some user, we can view that user's mails.
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="app.py"
 >
 ```py
@@ -658,7 +658,7 @@ if __name__ == "__main__":
         app.run("0.0.0.0", port=8080)
 ```
 
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 ### Poking holes
 
@@ -758,7 +758,7 @@ Those characters should be the correct characters of the flag, so you can just a
 
 Here's the full code, it's pretty long and janky, but it works:
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="app.py"
 >
 ```py
@@ -826,7 +826,7 @@ if __name__ == "__main__":
     app.run()
 
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 Anyway, after running for a while, we can generate the final flag ~~ok idk if this is really the full flag, the infra is down so i cant test so this is taken from a writeup~~:
 

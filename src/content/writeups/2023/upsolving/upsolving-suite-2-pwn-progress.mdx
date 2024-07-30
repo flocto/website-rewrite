@@ -5,7 +5,7 @@ description: My first time attempting real pwn.
 heroImage: "/img/writeups/2023/upsolving/pwn-upsolve-hero.png"
 ---
 
-import CollapsableCodeBlock from "../../../../components/CollapsableCodeBlock.astro";
+import CollapseBlock from "../../../../components/CollapseBlock.astro";
 
 So I'll just preface this post with a bit of a disclaimer, this isn't actually upsolving. I'll just be doing a writeup over `badchars` from the great site [ROP Emporium](https://ropemporium.com/). But, this is still my first time actually doing binary exploitation, so I'll try to be as thorough as possible for people in the same position. Do note this writeup assumes basic knowledge of assembly and the stack.
 
@@ -213,7 +213,7 @@ That's all the parts we need. But before we write the exploit we need to keep in
 
 Here's a quick draft of the exploit, I've created a helper function to make things easier:
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="solve.py"
 >
 ```py
@@ -279,7 +279,7 @@ payload += p64(elf.symbols['print_file'])
 
 ```
 
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 However, if we try to run this, it fails. We get a segfault, and no flag is printed. That's weird, what's going on?
 
@@ -321,7 +321,7 @@ will work just fine.
 ### Final solution
 Here's the final exploit:
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="solve.py"
 >
 ```py
@@ -384,7 +384,7 @@ payload += p64(elf.symbols['print_file'])
 p.sendline(payload)
 p.interactive()
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 And here's the flag:
 

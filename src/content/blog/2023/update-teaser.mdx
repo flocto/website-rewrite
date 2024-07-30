@@ -4,7 +4,7 @@ description: 'A long awaited update and announcements, as well as a small teaser
 pubDate: 'Nov 17 2023'
 heroImage: '/img/blog/2023/teaser-hero.png'
 ---
-import CollapsableCodeBlock from '../../../components/CollapsableCodeBlock.astro'
+import CollapseBlock from '../../../components/CollapseBlock.astro'
 
 It's been quite a while since I've posted here, I hope everyone is doing well.
 
@@ -29,7 +29,7 @@ Note that my advice may not be the best, but this is mainly more for me to force
 
 As a teaser for the first post, if you played in HITCON Finals recently, you may recall the KOTH challenge `expansion`, where you were given 5 different "binaries" all compiled with ELVM. I'll be going over one of the esolangs from that challenge, Befunge, so as a gift here's a basic (and possibly slightly broken) interpreter that I've written.
 
-<CollapsableCodeBlock filename="befunge.py">
+<CollapseBlock filename="befunge.py">
 ```python
 from random import randint
 import os.path
@@ -262,11 +262,11 @@ def main():
 if __name__ == "__main__":
     main()
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 And of course, I can't end the teaser without a challenge. Here's a small Befunge program that I wrote, can you figure out what it does?
 
-<CollapsableCodeBlock filename='challenge.bef'>
+<CollapseBlock filename='challenge.bef'>
 ```plaintext
       >92+2*1+3*99*99*v
 v  *99               p<
@@ -283,6 +283,6 @@ v  *99               p<
           @,,"NO"<     
 >99*g 55+::**67**+  -!^
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 That's all for now, see you soon!

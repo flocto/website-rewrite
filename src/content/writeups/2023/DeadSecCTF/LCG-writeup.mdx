@@ -4,7 +4,7 @@ pubDate: "May 22 2023"
 description: "Cracking LCGs and solving bivariate equations"
 heroImage: "/img/writeups/2023/deadsec-lcg-hero.png"
 ---
-import CollapsableCodeBlock from "../../../../components/CollapsableCodeBlock.astro";
+import CollapseBlock from "../../../../components/CollapseBlock.astro";
 
 Had a lot of fun playing DeadSecCTF this past weekend, here's a writeup for the challenge `LCG` in the `crypto` category.
 
@@ -14,7 +14,7 @@ Had a lot of fun playing DeadSecCTF this past weekend, here's a writeup for the 
 > [chall.py](#chall.py)
 > [out.txt](#out.txt)
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="chall.py"
 >
 ```python 
@@ -65,9 +65,9 @@ print(f"ct: {c}")
 print("Hint:")
 print([lcg.next() for _ in range(6)])
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="out.txt"
 >
 ```plaintext
@@ -76,7 +76,7 @@ ct: 1311926376266696686588993651557432857442740937252927694544858021117860328031
 Hint:
 [29861218495988619292793747700054834633, 80515105569441253388392760789853242718, 146729873894560318431962601721322042903, 147107348315338274128018394071748133508, 166087854880219056255852907837404957463, 210401924703541158042341118614982072753]
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 So here's the main setup:
 - We're given a basic RSA encrypted flag with `n` and `ct`.
@@ -298,7 +298,7 @@ It creates a bunch of monomials from the original bivariate polynomial and uses 
 
 Anyway, the solve implementation is the same, just call the provided `coron` method with the correct parameters.
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="solve.py"
 >
 ```python
@@ -313,7 +313,7 @@ p = p_high * 2^KNOWN_SIZE + p_low
 q = q_high * 2^KNOWN_SIZE + q_low
 print(p, q)
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 ```
 2014391014078298385848382718603864559304182057702332106747947726391450683922565863407711433231851216065404029594338847221099546815781164798298144058780631 10747887258904919568852319173708167129975394787092626003408658827329574207417581519371916706345292847334280224997653414111932233127444601482464256870134191
@@ -322,7 +322,7 @@ print(p, q)
 ## Flag
 Finally, we have recovered $p$ and $q$. All we need to do now is calculate $d$ and decrypt the flag.
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="solve.py"
 >
 ```python
@@ -336,7 +336,7 @@ print(long_to_bytes(m))
 
 # Dead{7d19a88ab11151c222a8b}
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 GG! :smile:
 
 ## Closing Thoughts

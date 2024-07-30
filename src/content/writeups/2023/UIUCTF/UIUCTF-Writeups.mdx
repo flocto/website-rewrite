@@ -5,7 +5,7 @@ description: Writeups for UIUCTF 2023, a CTF hosted by UIUC's SIGPwny. Really co
 heroImage: "/img/writeups/2023/uiuctf-hero.png"
 ---
 
-import CollapsableCodeBlock from "../../../../components/CollapsableCodeBlock.astro";
+import CollapseBlock from "../../../../components/CollapseBlock.astro";
 
 Once again another banger CTF from SigPwny, including a cool theme that I completely avoided to solve challenges faster. :joy::joy::joy: ~~_(jk the theme was actually cool tho)_~~
 
@@ -17,7 +17,7 @@ BTW, as a disclaimer, these vimjail writeups cover a solution that solves both t
 
 Anyway, starting with Vimjail 1, we're given this setup.
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="vimrc"
 >
 ```vim 
@@ -30,8 +30,8 @@ inoremap <c-z> nope
 inoremap <c-\><c-n> nope
 
 ````
-</CollapsableCodeBlock>
-<CollapsableCodeBlock
+</CollapseBlock>
+<CollapseBlock
 filename="entry.sh"
 >
 ```sh
@@ -40,7 +40,7 @@ filename="entry.sh"
 vim -R -M -Z -u /home/user/vimrc
 ````
 
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 and our goal is to somehow read `/flag.txt`, as expected of a jail.
 
@@ -293,7 +293,7 @@ Here's my reimplementation in `janet` and corresponding solve script:
 (print lat "," lon)
 ```
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="solve.py"
 >
 ```python
@@ -311,7 +311,7 @@ r.sendline(out)
 r.interactive()
 
 ````
-</CollapsableCodeBlock>
+</CollapseBlock>
 After a few tries and praying we get the timing right, we can get the flag.
 ```plaintext
 [+] Opening connection to geoguesser.chal.uiuc.tf on port 1337: Done
@@ -330,7 +330,7 @@ $
 
 The source is pretty small, basically just a simple web-server, so let's take a look at `app.py`:
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="app.py"
 >
 ```python
@@ -376,7 +376,7 @@ process.wait()
 return "Incorrect key", 400
 
 ````
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 Nothing too out of the ordinary, except that the `/check` POST endpoint seems to spawn a keychecker using something called `devicescript`.
 
@@ -386,7 +386,7 @@ Unfortunately, trying to disassemble the `keychecker.devs` as is fails, giving s
 
 After a bit, my teammate managed to find a pattern (thanks vishi), that could clean up the `keychecker.devs` program and leave it in a state where it was actually disassemblable.
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="fix_devs.py"
 >
 ```python
@@ -416,7 +416,7 @@ for idx in idxs:
 open("keychecker_fixed.devs", "wb").write(bytes(data_l))
 ````
 
-</CollapsableCodeBlock>
+</CollapseBlock>
 Now we can actually disassemble the program and figure out how to make a valid key.
 
 ## Disassembled
@@ -585,7 +585,7 @@ proc inline_F12(par0, par1): @5156
 
 This means that `G11` must contain 10 numbers that add up to `134`, and have a product of `12534912000`. Of course, we can easily just solve this with `z3`:
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="z3solve.py"
 >
 ```python
@@ -613,7 +613,7 @@ print(nums)
 # [15, 2, 15, 5, 4, 9, 13, 16, 31, 24]
 
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 Since the check was done with `reduce`, the order of the numbers don't matter, so we can just translate them directly, giving us the next two sections: `YANXA-G2G54-9DHZR`
 
 ### Check 3
@@ -684,7 +684,7 @@ This means to pass this check, we need to somehow initialize `G12` with the prop
 Before we start trying to solve this, another thing to realize is that `G13`, the counter, can be solved seperately from the rest of the `xorwow` PRNG. Since we know the amount of times
 the PRNG is called, we can pre-calculate the value `G13` when it will be called the last 3 times, and just subtract them from the target values:
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="calc_g13.py"
 >
 ```python
@@ -702,7 +702,7 @@ print(target)
 # [1563607211, -1897660814, -1748793603]
 ````
 
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 As for solving the actual xorshift part, after a bit of mucking around with Z3 and reversing, we realized that brute force was actually feasible. This is because there are only 5 numbers in the state, and each number can only have an initial value in 0-31, since there are only 32 letters in the alphabet.
 
@@ -710,7 +710,7 @@ That leaves a total search space of $2^{5 \cdot 5}$ = `33554432` which is defini
 
 I ended up coding my brute force in c++, directly translating the logic over:
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="brute.cpp"
 >
 ```c++
@@ -769,7 +769,7 @@ return 1;
 }
 
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 Even though the code is kinda ugly and unoptimized, compiling with `-O3` and letting it run only took ~60 seconds to finish and spit out a valid answer:
 ```
@@ -809,7 +809,7 @@ Finally, we're at the last challenge. This one is a bit different from the rest,
 
 First, let's take a look at the provided file:
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="server.py"
 >
 ```python
@@ -911,7 +911,7 @@ if __name__ == "__main__":
     main()
 ````
 
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 It might look like a lot, so I'll break it down step by step.
 
@@ -1662,7 +1662,7 @@ PWNED!
 
 Now it's just an easy case of calling `cat /flag.txt`, and getting our flag!
 
-<CollapsableCodeBlock
+<CollapseBlock
 filename="solve.py"
 >
 ```python
@@ -1702,7 +1702,7 @@ rest = r.recvall().decode()
 print(rest)
 
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 ```
 
      ┌──────────────┐┌───────────────────────┐

@@ -5,7 +5,7 @@ description: "A writeup of all 9 tasks from the 2023 NSA Codebreaker Challenge."
 heroImage: "/img/writeups/2024/NSA-Codebreaker-23/nsa-codebreaker-hero.png"
 ---
 
-import CollapsableCodeBlock from "../../../../components/CollapsableCodeBlock.astro";
+import CollapseBlock from "../../../../components/CollapseBlock.astro";
 
 # Preamble
 Hello to everyone reading this! This is a collection of writeups for the 2023 NSA Codebreaker Challenge. 
@@ -35,7 +35,7 @@ Anyway there's nothing to say for this one, just authenticate through the bot an
 > - Provide database record IDs, one per line, that fit within the parameters specified above.
 
 The first real task. We're asked to retrieve database record IDs that match the given logfile below:
-<CollapsableCodeBlock filename="USCG.log">
+<CollapseBlock filename="USCG.log">
 ```json
 {
     "coordinates": [
@@ -47,7 +47,7 @@ The first real task. We're asked to retrieve database record IDs that match the 
     "timestamp": "02/20/2023, 13:34:59"
 }
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 The database they give us is in the form of an SQLite 3 database, so we can simply connect with `sqlite3` and query the database on the given parameters.
 ```sql
@@ -95,7 +95,7 @@ This time, we're given two images and a boot log, and we need to identify a few 
 
 ![Task 2 Image of CPU](/img/writeups/2024/NSA-Codebreaker-23/cpu.jpg)
 ![Task 2 Pinout SVG](/img/writeups/2024/NSA-Codebreaker-23/pinout.svg)
-<CollapsableCodeBlock filename="boot.log">
+<CollapseBlock filename="boot.log">
 ```plaintext
 ***********************************************************
 *                                                                  *
@@ -113,7 +113,7 @@ Booting up...
 Collector is online.
 Alternative Function Assignment  :  ALT3
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 I'm honestly not too familiar with hardware at all, so I had to do quite a bit of research for this one. But first, starting with the power pin, since we are powering the GPIO header, we need 3.3v, which is the gold/tan color on the pinout.svg. 
 
@@ -698,7 +698,7 @@ Now, because this config has to be parsed by the binary, we can try looking for 
 ![Snippet of code in sub_400518](/img/writeups/2024/NSA-Codebreaker-23/task-7-binja-string-decomp.png)
 
 This leads us straight into our main function:
-<CollapsableCodeBlock filename="main()">
+<CollapseBlock filename="main()">
 ```c++
 int64_t sub_400518(int32_t arg1, int64_t* arg2)
 {
@@ -897,7 +897,7 @@ int64_t sub_400518(int32_t arg1, int64_t* arg2)
     /* no return */
 }
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 Yeah, that's really long...
 
@@ -1236,7 +1236,7 @@ We can get different errors by using a valid path but bad file like so, which te
 Additionally, if we don't get an error at all, we must have reached a completely valid folder, so we can stop there.
 
 In the end, this was the solver I ended up using:
-<CollapsableCodeBlock filename="solve.py">
+<CollapseBlock filename="solve.py">
 ```py
 from pwn import process
 import json
@@ -1308,7 +1308,7 @@ for ip in found:
     ip = [int(i, 16) for i in ip.split("/") if i != ".." and i]
     print(f"found {ip[0]}.{ip[1]}.{ip[2]}.{ip[3]}")
 ```
-</CollapsableCodeBlock>
+</CollapseBlock>
 
 After running and waiting a bit, we get our two IPs!
 ```
@@ -1333,5 +1333,132 @@ Honestly, this challenge isn't horribly difficult, but my main issue with it is 
 > 
 > - Enter the HMAC key string used to authenticate the given packet.
 
-ECDH :)
+This time, we're given a PCAP that's supposedly encrypted. We're also told it uses an HMAC scheme for authentication and we need to recover the secret HMAC key. This means we probably also have decrypt the packet in the process.
 
+Inside the PCAP, there's only a single UDP packet:
+![Wireshark showing a single UDP packet](/img/writeups/2024/NSA-Codebreaker-23/task-8-pcap.png)
+
+The packet is a UDP payload to port 9000 that's 288 bytes long. We know this is must be talking with the device, so there must be logic in one of the binaries that handles this.
+
+If we recall back to the `config` file that was passed into the `agent` binary, we have this
+```properties
+cmd_host = "0.0.0.0"
+cmd_port = 9000
+```
+
+Looking back at the `main` function of `agent`, there's a few things we can do.
+First, there's one function (`sub_402640`) that gets called over and over with readable string arguments, so let's call that `log_message`.
+
+Then, after the option parsing in `main`, there's also this snippet:
+```c++
+void* var_1260;
+sub_4218e0(&var_1260, nullptr, sub_402b34, &var_1228);
+void* var_1268;
+sub_4218e0(&var_1268, nullptr, sub_401794, &var_1258);
+void* var_1270;
+sub_4218e0(&var_1270, nullptr, sub_401220, &var_1088);
+```
+
+Going through each `sub_` function, we immediately see calls to `log_message`:
+```c++
+int64_t sub_402b34(int64_t* arg1)
+{
+    int64_t var_8 = 0;
+    log_message(2, &data_4a80c0[0x30], 0, "starting upload thread");
+    ...
+}
+...
+int64_t sub_401794(int64_t* arg1)
+{
+    int64_t var_8 = 0;
+    log_message(2, &data_4a80c0[0x30], 0, "starting collect thread");
+    ...
+}
+...
+int64_t sub_401220(struct thread_config* arg1_1)
+{
+    int64_t var_8 = 0;
+    log_message(2, &data_4a80c0[0x30], 0, "starting cmd thread");
+    ...
+}
+```
+
+Pretty clearly, these are the functions that act as different threads for the C2 process, so let's rename them. 
+
+For the upload thread, it sets the enviroment variables `DB_DATABASE`, `DB_COLLECTION`, and `DB_URL`, then calls the `dropper` binary, which we know is the thing that sends files back to the C2 server.
+
+The collect thread is a bit more complicated, it seems to be opening the devices from the `collectors_usb` and `collectors_ipc` options in the config file and reading some information from them.
+
+The final `cmd` thread is what we're looking for this time. In this function, before the main loop that runs the thread, it calls `sub_401db0`, a function that seemingly starts a listener on a UDP port, just what we're looking for:
+
+<CollapseBlock filename="sub_401db0">
+```c++
+uint64_t sub_401db0(char* arg1, int16_t arg2, int32_t* arg3, int64_t arg4)
+{
+    int64_t var_8 = 0;
+    void var_10;
+    sub_43ca00(&var_10, 6, 1, 6, &data_49f940);
+    int64_t s;
+    __builtin_memset(&s, 0, 0x30);
+    s = 1;
+    int64_t var_38 = 0x1100000002;
+    void* i_1;
+    int32_t x0_2 = sub_438990(arg1, &var_10, &s, &i_1);
+    int32_t x26;
+    if (x0_2 != 0)
+    {
+        x26 = 0;
+        log_message(4, &data_4a80c0[0x30], 0, "could not find %s:[%s]", arg1);
+    }
+    else
+    {
+        void* i = i_1;
+        x26 = x0_2;
+        int32_t x0_4;
+        int32_t x0_6;
+        if (i != 0)
+        {
+            do
+            {
+                x0_4 = sub_43c9c0(*(uint32_t*)((char*)i + 4), *(uint32_t*)((char*)i + 8), *(uint32_t*)((char*)i + 0xc));
+                if ((x0_4 & 0x80000000) == 0)
+                {
+                    int32_t var_4c = 1;
+                    sub_43c960(x0_4, 1, 2, &var_4c, 4);
+                    x0_6 = sub_43c640(x0_4, *(uint64_t*)((char*)i + 0x18), *(uint32_t*)((char*)i + 0x10));
+                    if (x0_6 == 0)
+                    {
+                        break;
+                    }
+                    sub_439780(x0_4);
+                }
+                i = *(uint64_t*)((char*)i + 0x28);
+            } while (i != 0);
+            if (((x0_4 & 0x80000000) == 0 && x0_6 == 0))
+            {
+                log_message(1, &data_4a80c0[0x30], 0, "listening on udp port %d", ((uint64_t)arg2));
+                x26 = 1;
+                sub_4002b0(arg4, *(uint64_t*)((char*)i + 0x18), ((uint64_t)*(uint32_t*)((char*)i + 0x10)));
+                *(uint32_t*)arg3 = x0_4;
+                sub_4392e0(i_1);
+            }
+            if ((!((x0_4 & 0x80000000) == 0 && x0_6 == 0)))
+            {
+                i = i_1;
+            }
+        }
+        if (((i != 0 && (!((x0_4 & 0x80000000) == 0 && x0_6 == 0))) || i == 0))
+        {
+            sub_4392e0(i);
+            log_message(4, &data_4a80c0[0x30], 0, "could not find interface to bind");
+        }
+    }
+    if (var_8 != 0)
+    {
+        sub_43cce0();
+        /* no return */
+    }
+    return ((uint64_t)x26);
+}
+```
+</CollapseBlock>
