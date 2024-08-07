@@ -1,0 +1,299 @@
+---
+title: "corCTF 2024 Writeups"
+pubDate: "July 30 2024"
+description: "Reverse engineering writeups from our first .;,;. win!"
+heroImage: "/img/writeups/2024/corCTF-24/hero.png"
+---
+
+import CollapseBlock from "../../../../components/CollapseBlock.astro";
+
+I still can't believe our first win as .;,;. was on corCTF of all CTFs! That's actually insane.
+
+Really really happy with how we did, and I can't believe this is how we qualify for DiceCTF finals :joy:. Anyway, here are writeups for the challenges I did. Even though one of them is forensics actually they were all reverse engineering.
+
+## forensics/schitty-challenge
+
+> author: plastic
+>
+> **26 solves / 216 points**
+>
+> We managed to capture the terminal output of a user while trying to obfuscate a shell script.
+>
+> [flag](/files/writeups/2024/corCTF-24/schitty/flag) | [file_information.c](/files/writeups/2024/corCTF-24/schitty/file_information.c) | [terminal_output.txt](/files/writeups/2024/corCTF-24/schitty/terminal_output.txt)
+
+We get an ELF file, a short C File, and finally some terminal output.
+
+<CollapseBlock filename="file_information.c">
+```c
+#include <stdio.h>     // printf
+#include <stdlib.h>    // malloc and free
+#include <string.h>    // memcpy
+#include <sys/stat.h>  //statf
+
+int file_info(char \* file)
+{
+struct stat statf[1];
+struct stat control[1];
+
+        if (stat(file, statf) < 0)
+                return -1;
+
+        /* Turn on stable fields */
+        memset(control, 0, sizeof(control));
+        control->st_ino = statf->st_ino;
+        control->st_dev = statf->st_dev;
+        control->st_rdev = statf->st_rdev;
+        control->st_uid = statf->st_uid;
+        control->st_gid = statf->st_gid;
+        control->st_size = statf->st_size;
+        control->st_mtime = statf->st_mtime;
+        control->st_ctime = statf->st_ctime;
+
+    // Print readable file information
+    printf("\nInode Number: %lu\n", control->st_ino);
+        printf("Device Number: %lu\n", control->st_dev);
+        printf("Device ID: %lu\n", control->st_rdev);
+        printf("User ID: %u\n", control->st_uid);
+        printf("Group ID: %u\n", control->st_gid);
+        printf("File Size: %ld\n", control->st_size);
+        printf("Last Modification Time: %ld\n", control->st_mtime);
+        printf("Last Status Change Time: %ld\n\n", control->st_ctime);
+
+        return 0;
+
+}
+
+int main(int argc, char \*\* argv)
+{
+file_info(argv[1]);
+return 1;
+}
+
+````
+</CollapseBlock>
+
+<CollapseBlock filename="terminal_output.txt">
+```plaintext
+fart@fartbox:~$ uname -a
+Linux fartbox 6.5.0-28-generic #29~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Thu Apr  4 14:39:20 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+fart@fartbox:~$ shc -C
+shc Version 4.0.3, Generic Shell Script Compiler
+shc GNU GPL Version 3 Md Jahidul Hamid <jahidulhamid@yahoo.com>
+shc Copying:
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    @Neurobin, Dhaka, Bangladesh
+
+    Report problems and questions to:http://github.com/neurobin/shc
+
+    Md Jahidul Hamid <jahidulhamid@yahoo.com>
+
+fart@fartbox:~$ shc -U -H -v -o flag -f flag.sh && rm flag.sh.x.c && rm flag.sh
+shc shll=sh
+shc [-i]=-c
+shc [-x]=exec '%s' "$@"
+shc [-l]=
+shc opts=
+shc: cc   flag.sh.x.c -o flag
+shc: strip flag.sh.x
+shc: chmod ug=rwx,o=rx flag.sh.x
+fart@fartbox:~$ ./file_information /bin/sh
+
+Inode Number: 42467530
+Device Number: 2050
+Device ID: 0
+User ID: 0
+Group ID: 0
+File Size: 125688
+Last Modification Time: 1648043363
+Last Status Change Time: 1686442713
+
+fart@fartbox:~$
+
+````
+
+</CollapseBlock>
+
+The C file isn't really useful. It's mostly just there to show that the `./file_information` command run in the terminal output prints the results of the `stat` function on the original `/bin/sh`.
+
+On the other hand, the terminal output tells us a lot. First, it tells us that the flag binary was generated from running `shc` on a shell script called `flag.sh`. The goal of the challenge is probably to recover this shell script to get the flag.
+
+`shc` is a [shell script compiler](https://github.com/neurobin/shc). It takes a shell script, and "compiles" it into a binary. However, by "compile", it actually means encrypting the original script and embedding it into the binary.
+
+In this case, we have a few flags that change the behavior of `shc`:
+
+-   `-U` tells `shc` to create an untraceable (no strace/ptrace) binary
+-   `-H` tells `shc` to create a "hardened" binary, which only works for the default shell and supposedly makes it harder to reverse engineer.
+-   `-v` is for verbose, and `-o` and `-f` are for output and input files respectively.
+
+### rev in disguise
+
+If we toss the binary into a decompiler, we see a fairly interesting main function:
+
+```c
+int32_t main(int32_t argc, char** argv, char** envp)
+    sub_32eb()
+    sub_366b(*argv)
+    argv[1] = sub_37b8(argc, argv)
+    char const* const r12
+
+    if (argv[1] == 0)
+        r12 = "<null>"
+    else
+        r12 = argv[1]
+
+    char* rbx_1
+
+    if (*__errno_location() == 0)
+        rbx_1 = &data_4102
+    else
+        rbx_1 = strerror(errnum: *__errno_location())
+
+    void* const rax_17
+
+    if (*__errno_location() == 0)
+        rax_17 = &data_4102
+    else
+        rax_17 = &data_49d8
+
+    fprintf(stream: stderr, format: "%s%s%s: %s\n", *argv, rax_17, rbx_1, r12, argv)
+    return 1
+```
+
+If we try running it, we fail a check in `sub_32eb`, the first function:
+
+```
+$ ./flag
+Operation not permitted
+Killed
+```
+
+```c
+int64_t sub_32eb()
+    void* fsbase
+    int64_t rax = *(fsbase + 0x28)
+    prctl(option: 4, 0)
+    prctl(option: 0x59616d61, 0xffffffff)
+    int32_t rax_3 = getppid()
+    int64_t s
+    __builtin_memset(&s, c: 0, n: 0x100)
+    sub_31cf(rax_3, &s)
+
+    if (strcmp(&s, "bash") != 0 && strcmp(&s, "/bin/bash") != 0 && strcmp(&s, &data_4918) != 0 && strcmp(&s, "/bin/sh") != 0 && strcmp(&s, "sudo") != 0 && strcmp(&s, "/bin/sudo") != 0 && strcmp(&s, "/usr/bin/sudo") != 0 && strcmp(&s, "gksudo") != 0 && strcmp(&s, "/bin/gksudo") != 0 && strcmp(&s, "/usr/bin/gksudo") != 0 && strcmp(&s, "kdesu") != 0 && strcmp(&s, "/bin/kdesu") != 0 && strcmp(&s, "/usr/bin/kdesu") != 0)
+        puts(str: "Operation not permitted")
+        kill(zx.q(getpid()), 9)
+        exit(status: 1)
+        noreturn
+
+    if (rax == *(fsbase + 0x28))
+        return rax - *(fsbase + 0x28)
+
+    __stack_chk_fail()
+    noreturn
+```
+
+All we need to do is patch out the call to this function and the binary will continue.
+
+Here's what it does after ignoring the first function:
+
+```
+$ ./flag_patched
+sh: 1: .����ޙC��Wjm�b˪�#��s��E۶$�Бt�: not found
+sh: 2: Syntax error: word unexpected (expecting ")")
+```
+
+Clearly something is going wrong in the decryption here. Thankfully, we have a cool trick up our sleeve that means we don't need to reverse anything else!
+
+### who actually wants to rev though
+
+Yep! We can use our good ol' friend `LD_PRELOAD` to intercept the library calls used by the binary. I won't go over the technique since there's lots of better tools to learn it elsewhere, but essentially it let's use provide our own definition for functions like `execve` and `stat` that the binary uses.
+
+Additionally I'll skip over the process of enumerating each and every function since only a few are useful. Here's the final code I ended up using:
+
+<CollapseBlock filename="ld_preload.c">
+```c
+#define _GNU_SOURCE
+#include <stdio.h>     // printf
+#include <sys/stat.h>  // statf
+#include <dlfcn.h>
+
+int stat(const char _**restrict** \_\_file, struct stat _**restrict** **buf) {
+int (_real_stat)(const char _**restrict\_\_ **file, struct stat \***restrict\_\_ **buf) = dlsym(RTLD_NEXT, "stat");
+if (strcmp(**file, "/bin/sh") == 0) {
+**buf->st_ino = 42467530;
+**buf->st_dev = 2050;
+**buf->st_rdev = 0;
+**buf->st_uid = 0;
+**buf->st_gid = 0;
+**buf->st_size = 125688;
+**buf->st_mtime = 1648043363;
+**buf->st_ctime = 1686442713;
+printf("stat: %s\n", **file);
+return 0;
+}
+return real_stat(**file, \_\_buf);
+}
+
+int execvp(const char *file, char *const argv[]) {
+int (*real_execvp)(const char *file, char \*const argv[]) = dlsym(RTLD_NEXT, "execvp");
+printf("execvp: %s\n", file);
+for (int i = 0; argv[i] != NULL; i++) {
+printf("arg %d: %s\n", i, argv[i]);
+}
+return real_execvp(file, argv);
+}
+
+int system(const char *command) {
+int (*real_system)(const char \*command) = dlsym(RTLD_NEXT, "system");
+printf("system: %s\n", command);
+return real_system(command);
+}
+
+FILE* fopen(const char *filename, const char _mode) {
+FILE_ (*real_fopen)(const char *filename, const char \*mode) = dlsym(RTLD_NEXT, "fopen");
+printf("fopen: %s %s\n", filename, mode);
+return real_fopen(filename, mode);
+}
+
+// gcc -shared -fPIC -o ld_preload.so ld_preload.c
+
+````
+</CollapseBlock>
+
+At some point in the binary, it uses the results of the `stat` function on `/bin/sh` to help decrypt the shell script. However, since we know the outputs of this function from the terminal output, we can override this specific call to return the proper inputs to successfully decrypt the shell script.
+
+Putting it all together, we can compile the above code to a shared object, and run the patched flag binary with `LD_PRELOAD` properly set, and we get the flag!
+```bash
+$ gcc -shared -fPIC -o ld_preload.so ld_preload.c
+$ LD_PRELOAD=./ld_preload.so ./flag_patched
+stat: /bin/sh
+fopen: /tmp/shc_x.c w
+fopen: /tmp/shc_x.c w
+system: cc -Wall -fpic -shared -o /tmp/shc_x.so /tmp/shc_x.c -ldl
+system: cc -Wall -fpic -shared -o /tmp/shc_x.so /tmp/shc_x.c -ldl
+fopen: /tmp/cc76RMn7.s w
+fopen: /tmp/ccN7B49z.s w
+fopen: /tmp/shc_x.c r
+fopen: /tmp/shc_x.c r
+... [truncated]
+system: #!/bin/sh
+
+# corctf{shell_script_compilers_are_not_safe_rc4_is_dumb_this_challenge_sucks}
+echo "corctf{not_the_flag}"
+
+corctf{not_the_flag}
+````
+
+The final shell script has the flag as a comment, meaning we had to actually retrieve the whole script, but the `system` call sees it all anyway, so we're good to go!
+
