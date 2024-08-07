@@ -297,3 +297,404 @@ corctf{not_the_flag}
 
 The final shell script has the flag as a comment, meaning we had to actually retrieve the whole script, but the `system` call sees it all anyway, so we're good to go!
 
+## rev/cormine
+
+**Note: This is a 2-part challenge, but my solution solves both parts so I'll just be writing as one challenge. Both challenges use the same binary.**
+
+> author: clubby, strellic
+>
+> **8 solves / 362 points**
+>
+> Crusaders of Rust Gaming Division is proud to present our first totally original title: corMine! Please enjoy exclusive access to this alpha test!
+>
+> Controls:
+>
+> -   WASD - Movement
+> -   Space - Jump
+> -   F9 - Save level to `game.cms`
+> -   Esc - Release/grab mouse
+> -   Hold Esc - Quit
+>
+> Remember, if you spot any bugs, no you didn't. `./cormine load cormine1.cms`
+>
+> Troubleshooting: If you're unable to run the challenge, try the below steps.
+>
+> -   If using Wayland, don't!
+> -   Try `export WGPU_BACKEND=vulkan` before the challenge
+>
+> [cormine](/files/writeups/2024/corCTF-24/cormine/cormine) | [cormine1.cms](/files/writeups/2024/corCTF-24/cormine/cormine1.cms) | [cormine2.cms](/files/writeups/2024/corCTF-24/cormine/cormine2.cms)
+
+As a warning, this challenge is a Rust Bevy binary, meaning it is HUGE. I won't pasting whole decompilations, so it might be a bit hard to find exactly where I'm talking about (I'll give addresses though). ~~also binja op~~
+
+### Saving the level
+First things first, obviously the flag is somehow stored inside our given `.cms` files. We don't want to look for this logic just yet, since the binary is really big, but there is a trick we can use.
+
+Since we know `F9` saves the level to `game.cms`, it must run the same logic as loading a save, just in reverse. 
+
+Good thing for us, searching for the string `game.cms` gives us pretty close to our target location.
+```c
+0x1db8140 int64_t <bevy_ecs::system::function_system::FunctionSystem<Marker,F> as bevy_ecs::system::system::System>::run_unsafe::hf653820ccd9abe7c(void* arg1, void* arg2) {
+    ...
+    __builtin_strncpy(dest: &str, src: "game.cms", n: 9)
+    uint32_t (* buf_1)[0x40] = &str
+    core::ffi::c_str::CStr::from_bytes_with_nul::h4e10a7c7207d9b50()
+    void*** rbx_6
+    
+    if (buf != 0)
+        rbx_6 = anyhow::error::<impl cor...yhow::Error>::from::he4dc447bd7a8c078(&str_"file name contained an unexpected NUL byte")
+    else
+        std::sys::pal::unix::fs::File::open_c::h1e3e50edcc9152f4()
+        struct RustStringSlice* var_2a0
+        
+        if (var_2a8.d != 0)
+            rbx_6 = anyhow::error::<impl cor...yhow::Error>::from::he4dc447bd7a8c078(var_2a0)
+        else
+            int32_t fd = var_2a8:4.d
+            str[0] = rsi_2.d
+            uint64_t nbytes_4 = 4
+            
+            while (true)
+                uint64_t nbytes = 0x7fffffffffffffff
+                
+                if (nbytes_4 u< 0x7fffffffffffffff)
+                    nbytes = nbytes_4
+                
+                ssize_t rax_42 = write(fd, buf: buf_1, nbytes)
+                ...
+```
+We can see that a file is being opened, presumably `game.cms`, and then later written to. 
+
+Scrolling a bit further down, we see something very intimdating:
+![Lots of multiplication and addition by 2 constants](/img/writeups/2024/corCTF-24/cormine_constants.png)
+
+At first glance, this is definitely some inlined operation. Thankfully, if we extract the two constants `0x5851f42d4c957f2d` and `-0x5e89ab1b9041e80d`, we can google their numerical values `6364136223846793005` and `11634580027462260723`, and we find [this result](https://github.com/rust-random/rand/blob/master/rand_core/src/lib.rs#L359):
+
+![rust random seed_from_u64 source](/img/writeups/2024/corCTF-24/cormine_seed_from_u64.png)
+
+That means this function must be creating some PRNG with a seed. Problem is, what's the PRNG or the seed? 
+
+### Slide to the left...
+Scrolling down just a tiny bit more, we see two function calls:
+![rand_chacha::guts::init_chacha](/img/writeups/2024/corCTF-24/cormine_chacha_init.png)
+![rand_chacha::guts::refill_wide_6](/img/writeups/2024/corCTF-24/cormine_refill_wide_6.png)
+
+We can probably guess that the we have some ChaCha based PRNG, and by doing a quick search for the `rand_chacha` crate and with the information of the second function call having an argument of 6, we can assume that we are seeding a [ChaCha12Rng](https://docs.rs/rand_chacha/latest/rand_chacha/struct.ChaCha12Rng.html). If you're aware of how the SALSA/ChaCha family of PRNGs work, this makes sense since the argument being 6 is the number of odd/even rounds, which means 12 rounds total, so `ChaCha12Rng`.
+
+### ...and slide to the right
+Now, we could keep going and see how the PRNG is used to help save the file, but remember, our goal is to *load* the file, not save it. So, let's look at other places these functions are called.
+
+As you can see from the amazingly labeled diagram, there's just one other place where the function is called 4 times, and that's where the save is being loaded.
+![cormine_save_and_load](/img/writeups/2024/corCTF-24/cormine_save_and_load.png)
+
+Going to the `load` calls, we can scroll up to see where it opens and first reads from the file. This function is really long and complex, so here's a basically condensed version of the important bit:
+```c
+0x1d98f60 int64_t <bevy_ecs::system::function_system::FunctionSystem<Marker,F> as bevy_ecs::system::system::System>::run_unsafe::h06b810d262677ad4(void* arg1, void* arg2) {
+    uint32_t tmp_buf[0x40]
+    ...
+    uint64_t nbytes = 4
+    uint32_t (* buf_1)[0x40] = &tmp_buf
+
+    ssize_t rax_11 = read(fd /* our save file */, buf: buf_1, nbytes) 
+    ...
+    uint64_t seed = zx.q(tmp_buf[0])
+    // This `seed` value eventually becomes the first value in the `seed_from_u64` inline function
+}
+```
+
+This means the first 4 bytes of the file are actually our seed for the ChaCha PRNG! Right after this section it reads in 2 bytes. I assume this is for the size of the world, but it's not super important and I didn't look into it.
+
+Next, scrolling past the inline `seed_from_u64` and `init_chacha`, we get to this section (again, this is heavily condensed):
+```c
+uint128_t rdx = cormine_shared::save::Serializer<Cursor>::read_leb128_signed::he32d2bd5e2a4a56b(fd);
+int32_t X = rdx.d ^ chacha_buf[chacha_i];
+chacha_i += 1;
+
+rdx = cormine_shared::save::Serializer<Cursor>::read_leb128_signed::he32d2bd5e2a4a56b(fd);
+int32_t Y = rdx.d ^ chacha_buf[chacha_i];
+chacha_i += 1;
+
+rdx = cormine_shared::save::Serializer<Cursor>::read_leb128_signed::he32d2bd5e2a4a56b(fd);
+int32_t Z = rdx.d ^ chacha_buf[chacha_i];
+chacha_i += 1;
+
+char type;
+read(fd, &type, 1);
+
+type ^= chacha_buf[chacha_i].b;
+
+struct Block block = {X, Y, Z, type}; // Obviously it doesn't look like this in the decomp but you get the idea that it gets packed into a struct
+``` 
+
+It reads in 3 values, XORs them with the PRNG output to get the position of the block, then XORs just a single byte with the PRNG output to get the type of the block.
+
+As for how it reads in the values, here's what the decomp of the function looks like:
+<CollapseBlock filename="Serializer<Cursor>::read_leb128_signed">
+
+```c
+uint64_t cormine_shared::save::Serializer<Cursor>::read_leb128_signed::he32d2bd5e2a4a56b(int32_t fd) {
+    int32_t rcx = 0
+    int64_t rdx = 0
+    while (true)
+        char var_41 = 0
+        uint64_t nbytes_2 = 1
+        char* buf = &var_41
+        
+        while (true)
+            uint64_t nbytes = 0x7fffffffffffffff
+            
+            if (nbytes_2 u< 0x7fffffffffffffff)
+                nbytes = nbytes_2
+            
+            ssize_t rax_4 = read(fd, buf, nbytes)
+            struct RustStringSlice* const r12_2
+            
+            if (rax_4 == -1)
+                int64_t r12_1 = sx.q(*__errno_location())
+                
+                if (r12_1 != 4)
+                    r12_2 = r12_1 << 0x20 | 2
+                else if (nbytes_2 == 0)
+                    label_1dce768:
+                    uint64_t rdi_1 = zx.q(var_41)
+                    
+                    if (rcx != 0x3f || rdi_1 == 0 || rdi_1.d == 0x7f)
+                        uint64_t result = zx.q(rdi_1.d & 0x7f) << rcx.b
+                        rdx |= result
+                        rcx += 7
+                        
+                        if (rdi_1.b s>= 0)
+                            return result
+                        
+                        break
+                    
+                    if (rdi_1.b s< 0)
+                        nbytes_2 = 1
+                        char* buf_1 = &var_41
+                        r12_2 = &str_"failed to fill whole buffer"
+                        
+                        while (true)
+                            uint64_t nbytes_1 = 0x7fffffffffffffff
+                            
+                            if (nbytes_2 u< 0x7fffffffffffffff)
+                                nbytes_1 = nbytes_2
+                            
+                            rax_4 = read(fd, buf: buf_1, nbytes: nbytes_1)
+                            
+                            if (rax_4 == -1)
+                                int64_t rax_7 = sx.q(*__errno_location())
+                                
+                                if (rax_7 != 4)
+                                    r12_2 = rax_7 << 0x20 | 2
+                                    goto label_1dce7ab
+                            else
+                                if (rax_4 == 0)
+                                    goto label_1dce7ab
+                                
+                                if (nbytes_2 u< rax_4)
+                                    goto label_1dce878
+                                
+                                buf_1 = &buf_1[rax_4]
+                                nbytes_2 -= rax_4
+                            
+                            if (nbytes_2 == 0)
+                                buf_1 = &var_41
+                                nbytes_2 = 1
+                                
+                                if (var_41 s>= 0)
+                                    break
+                    
+                    r12_2 = nullptr
+                else
+                    continue
+            else
+                if (rax_4 != 0)
+                    if (nbytes_2 u< rax_4)
+                        label_1dce878:
+                        core::slice::index::slic...art_index_len_fail::h9494061f39b55dc2()
+                        noreturn
+                    
+                    buf = &buf[rax_4]
+                    nbytes_2 -= rax_4
+                    
+                    if (nbytes_2 != 0)
+                        continue
+                    
+                    goto label_1dce768
+                
+                r12_2 = &str_"failed to fill whole buffer"
+            
+            label_1dce7ab:
+            anyhow::error::<impl cor...yhow::Error>::from::h08a5f13b3936c0b5(r12_2)
+            return 1
+}
+```
+
+</CollapseBlock>
+
+Here's my reimplementation in Rust, do note that since each XOR is done with one uint32, we can return a u64 and just cast it to a u32 when needed.
+```rust
+fn read_serialized<R: Read>(reader: &mut R) -> u64 {
+    let mut buf = [0; 1];
+    let mut result = 0;
+    let mut shift = 0;
+    let mask = 0xffff_ffff_ffff_ffff;
+    loop {
+        reader.read_exact(&mut buf).unwrap();
+        let byte = buf[0];
+        result = result | ((byte & 0x7f) as u64) << shift;
+        shift += 7;
+        if byte & 0x80 == 0 {
+            if byte & 0x40 != 0 {
+                result |= (mask << shift) & mask;
+            }
+            break;
+        }
+    }
+    result
+}
+```
+
+### Putting it all together
+Now all we have to do is basically reimplement the reader and just dump the map to a file. Here's my final parser, ~~yes i know i suck at rust ok i just wanted to solve the challenge~~:
+
+<CollapseBlock filename="cormine_parser.rs">
+
+```rust
+use byteorder::ReadBytesExt;
+use byteorder::LittleEndian;
+use rand_chacha::rand_core::RngCore;
+use rand_chacha::rand_core::SeedableRng;
+use rand_chacha::ChaCha12Rng;
+use std::env;
+use std::io::BufReader;
+use std::io::Read;
+
+fn read_serialized<R: Read>(reader: &mut R) -> u64 {
+    let mut buf = [0; 1];
+    let mut result = 0;
+    let mut shift = 0;
+    let mask = 0xffff_ffff_ffff_ffff;
+    loop {
+        reader.read_exact(&mut buf).unwrap();
+        let byte = buf[0];
+        result = result | ((byte & 0x7f) as u64) << shift;
+        shift += 7;
+        if byte & 0x80 == 0 {
+            if byte & 0x40 != 0 {
+                result |= (mask << shift) & mask;
+            }
+            break;
+        }
+    }
+    result
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 2 {
+        eprintln!("Usage: {} <file>", args[0]);
+        std::process::exit(1);
+    }
+
+    let file = std::fs::File::open(&args[1]).unwrap();
+    let mut rdr = BufReader::new(file);
+
+    let seed = rdr.read_u32::<LittleEndian>().unwrap() as u64;
+    rdr.read_u16::<LittleEndian>().unwrap(); // Not sure what this is used for
+
+
+    let mut rng = ChaCha12Rng::seed_from_u64(seed);
+    let mut tmp = [0u8; 1];
+
+    let mut decrypt = |dat: u64| -> u32 {
+        let prng_out = rng.next_u32();
+        (dat as u32) ^ prng_out
+    };
+
+    loop {
+        let x = decrypt(read_serialized(&mut rdr));
+        let y = decrypt(read_serialized(&mut rdr));
+        let z = decrypt(read_serialized(&mut rdr));
+        rdr.read_exact(&mut tmp).unwrap();
+        let typ = decrypt(tmp[0] as u64) as u8;
+
+        println!("{}, {}, {}, {}", x as i32, y as i32, z as i32, typ as i32);
+
+        if rdr.read_exact(&mut tmp).is_err() {
+            break;
+        }
+        rdr.seek_relative(-1).unwrap();
+    }
+}
+```
+
+</CollapseBlock>
+
+Running this on the `cormine1.cms` file, we get the following output [(download)](/files/writeups/2024/corCTF-24/cormine1.txt):
+```
+1, 95, 16, 0
+2, 95, 16, 0
+3, 95, 16, 0
+4, 95, 16, 0
+0, 94, 16, 0
+0, 93, 16, 0
+0, 92, 16, 0
+1, 91, 16, 0
+2, 91, 16, 0
+3, 91, 16, 0
+4, 91, 16, 0
+7, 95, 16, 0
+8, 95, 16, 0
+9, 95, 16, 0
+6, 94, 16, 0
+...
+```
+
+Now, remember this isn't the flag, its just the blocks we have. All we need to do to get the flag is to just visualize the block id 0s, and we get the flag!
+```python
+import matplotlib.pyplot as plt
+
+data = open('dump.txt').readlines()
+data = [eval(x.strip()) for x in data]
+
+data = [(x, y, z, id) for (x, y, z, id) in data if id == 0]
+
+x = [d[0] / 2 for d in data]
+y = [d[1] for d in data]
+
+fig = plt.figure()
+ax = fig.add_subplot(111)
+ax.scatter(x, y, s=10)
+plt.ylim(50, 150)
+plt.savefig('cormine1_flag.png')
+```
+![cormine1 flag](/img/writeups/2024/corCTF-24/cormine1_flag.png)
+
+And our flag is `corctf{w4llh4cks}`.
+
+For the second part, we can repeat the exact same thing, getting this output [(download)](/files/writeups/2024/corCTF-24/cormine2.txt):
+```
+1, 95, 16, 3
+1, 95, 16, 255
+2, 95, 16, 3
+2, 95, 16, 255
+3, 95, 16, 3
+3, 95, 16, 255
+4, 95, 16, 3
+4, 95, 16, 255
+0, 94, 16, 3
+0, 94, 16, 255
+0, 93, 16, 3
+0, 93, 16, 255
+...
+```
+
+As you can see, the old blocks are being overwritten with an invalid block id. All we have to do is just ignore these and only plot the id 3, and we get the flag!
+```diff
+- data = [(x, y, z, id) for (x, y, z, id) in data if id == 0]
++ data = [(x, y, z, id) for (x, y, z, id) in data if id == 3]
+```
+
+![cormine2 flag](/img/writeups/2024/corCTF-24/cormine2_flag.png)
+
+And our flag is `corctf{0v3rwrit3}`.
